@@ -1,0 +1,69 @@
+{
+  "name": "@kennielearngames/dsh-arcade",
+  "version": "0.1.0",
+  "description": "🕹️ dsh-arcade — a pixel-art arcade that lives above your DeepSeek Harness composer. Click the whale tail while the model is thinking and play a quick run: sushi, whale tokens, crabs, bamboo and cliff pits.",
+  "type": "module",
+  "main": "index.js",
+  "author": "zhangyuzhangyu233",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zhangyuzhangyu233/dsh-arcade.git"
+  },
+  "homepage": "https://github.com/zhangyuzhangyu233/dsh-arcade#readme",
+  "bugs": {
+    "url": "https://github.com/zhangyuzhangyu233/dsh-arcade/issues"
+  },
+  "icon": "./assets/branding/icon.png",
+  "keywords": [
+    "dsh",
+    "dsh-plugin",
+    "deepseek-harness",
+    "arcade",
+    "pixel-art",
+    "game",
+    "runner",
+    "browser-game",
+    "街机",
+    "小游戏"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "node tools/build.mjs",
+    "build:powerups": "node tools/build-powerups.mjs",
+    "check": "node tools/check-engine.mjs",
+    "build:selftest": "node tools/build.mjs --selftest",
+    "banner": "python tools/make-banner.py"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./cordis.patch.yml": "./cordis.patch.yml",
+    "./icon": "./assets/branding/icon.png",
+    "./locale/*.json": "./locale/*.json",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale",
+    "assets/branding/icon.png",
+    "README.md",
+    "LICENSE"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true
+    }
+  }
+}

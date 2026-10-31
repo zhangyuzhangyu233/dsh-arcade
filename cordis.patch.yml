@@ -1,0 +1,5 @@
+# Insert the dsh-arcade bundle row. The name is the published package specifier
+# so the Loader can resolve it from the profile's node_modules.
+- insert:
+    - id: arcade
+      name: '@kennielearngames/dsh-arcade'

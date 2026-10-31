@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>寿司跑酷 · preview</title>
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif; font-size: 14px;
+    display: flex; flex-direction: column; background: #151517; color: #f9fafb; }
+  .chat { flex: 1; overflow: hidden; padding: 22px 24px 0; display: flex; flex-direction: column;
+    gap: 12px; align-items: center; }
+  .bubble { width: 672px; max-width: 100%; box-sizing: border-box; border-radius: 14px;
+    padding: 10px 14px; font-size: 13px; line-height: 1.6; opacity: .72; }
+  .bubble.user { align-self: center; width: 420px; }
+  .composer { display: flex; flex-direction: column; align-items: center; padding: 0 24px 20px; }
+  .dock { width: calc(100% - 0px); display: flex; justify-content: center; }
+  .card { width: 672px; max-width: 100%; box-sizing: border-box; border-radius: 18px;
+    padding: 16px 18px; font-size: 14px; }
+  .fake-input { opacity: .55; }
+</style>
+</head>
+<body>
+  <div class="chat">
+    <div class="bubble">这是一条普通的消息，用来确认游戏面板下方/上方的会话内容不会被遮住。</div>
+    <div class="bubble user">开始游戏的时候，整个会话布局上移到游戏框上方。</div>
+    <div class="bubble">游戏窗口现在占据真实布局空间：它会压缩会话区域，而不是悬浮在内容上方。</div>
+  </div>
+  <div class="composer">
+    <div class="dock" id="dock"></div>
+    <div class="card" data-composer-card>
+      <div class="fake-input">发消息或创建任务，/ 调用指令，@ 文件或对话</div>
+    </div>
+  </div>
+  <pre id="out" style="position:fixed;left:-9999px"></pre>
+  <script src="./bundle.js"></script>
+</body>
+</html>
