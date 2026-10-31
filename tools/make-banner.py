@@ -64,6 +64,57 @@ def logo_layer(width, height, logo_path, fraction_w, top_fraction):
     return layer, x, y, logo.width, logo.height
 
 
+
+NPM_CMD = "npm i @kennielearngames/dsh-arcade"
+NPM_COLORS = [(238, 91, 87), (242, 201, 76), (76, 195, 138), (76, 201, 240),
+              (176, 106, 179), (242, 153, 74), (91, 124, 250), (168, 224, 99)]
+CREAM = (255, 246, 214, 255)
+NAVY = (15, 20, 48, 255)
+
+
+def pixel_command(text, target_h):
+    """Chunky pixel glyphs: cream border, navy outline, bright colour fill —
+    the same layering as the pixel wordmark, rendered low-res then nearest-upscaled."""
+    base = max(12, int(target_h / 2.6))
+    font = ImageFont.truetype("C:/Windows/Fonts/consolab.ttf", base)
+    spacing = max(1, base // 8)
+    margin = 5
+    widths = [max(1, round(font.getlength(ch))) for ch in text]
+    low_w = sum(widths) + spacing * (len(text) - 1) + margin * 2
+    low_h = base * 2 + margin * 2
+    low = Image.new("RGBA", (low_w, low_h), (0, 0, 0, 0))
+    d = ImageDraw.Draw(low)
+    x = margin
+    for i, ch in enumerate(text):
+        d.text((x, margin), ch, font=font, fill=CREAM, stroke_width=2, stroke_fill=CREAM)
+        d.text((x, margin), ch, font=font, fill=NAVY, stroke_width=1, stroke_fill=NAVY)
+        d.text((x, margin), ch, font=font, fill=NPM_COLORS[i % len(NPM_COLORS)] + (255,))
+        x += widths[i] + spacing
+    bbox = low.getbbox()
+    low = low.crop(bbox)
+    scale = max(2, round(target_h / low.height))
+    return low.resize((low.width * scale, low.height * scale), Image.NEAREST)
+
+
+def draw_npm_badge(base, width, height):
+    cmd = pixel_command(NPM_CMD, target_h=int(height * 0.050))
+    pad_x = max(16, cmd.height // 2)
+    pad_y = max(8, cmd.height // 4)
+    bw, bh = cmd.width + pad_x * 2, cmd.height + pad_y * 2
+    x, y = (width - bw) // 2, height - int(height * 0.045) - bh
+    shadow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    sd = ImageDraw.Draw(shadow)
+    sd.rounded_rectangle([x + 3, y + 6, x + bw + 3, y + bh + 6], radius=8,
+                         fill=(4, 8, 20, 140))
+    base.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(4)))
+    plate = Image.new("RGBA", (bw, bh), (0, 0, 0, 0))
+    pd = ImageDraw.Draw(plate)
+    pd.rounded_rectangle([0, 0, bw - 1, bh - 1], radius=8,
+                         fill=(12, 16, 38, 205), outline=CREAM, width=2)
+    plate.alpha_composite(cmd, (pad_x, pad_y))
+    base.alpha_composite(plate, (x, y))
+
+
 def compose(width, height, output, logo_fraction=LOGO_WIDTH, logo_top=SKY_LOGO_TOP,
             subtitle_h=58):
     bg = Image.open(f"{ROOT}/seaside.webp").convert("RGBA")
@@ -93,6 +144,8 @@ def compose(width, height, output, logo_fraction=LOGO_WIDTH, logo_top=SKY_LOGO_T
     sy = ly + lh + int(height * SUBTITLE_GAP / 1080)
     base.alpha_composite(hard_shadow(sub, 0, max(3, subtitle_h // 9)), (sx, sy))
     base.alpha_composite(sub, (sx, sy))
+
+    draw_npm_badge(base, width, height)
 
     base.convert("RGB").save(output, optimize=True)
     print("wrote", output, base.size)
