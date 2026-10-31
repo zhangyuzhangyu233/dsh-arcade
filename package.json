@@ -1,6 +1,6 @@
 {
   "name": "@kennielearngames/dsh-arcade",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "🕹️ dsh-arcade — a pixel-art arcade that lives above your DeepSeek Harness composer. Click the whale tail while the model is thinking and play a quick run: sushi, whale tokens, crabs, bamboo and cliff pits.",
   "type": "module",
   "main": "index.js",

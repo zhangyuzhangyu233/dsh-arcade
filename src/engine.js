@@ -131,6 +131,11 @@ const CRAB = {
   smashPoints: 80,
 };
 
+/** Level-intro choreography: the road unrolls left -> right, then the maid
+ *  starts running. CSS owns the road/HUD reveal; the engine only gates input
+ *  and the spawners until the animation has finished. */
+const INTRO_TOTAL = 0.62;          // s: 60ms delay + 420ms sweep + ~140ms settle
+
 const frameCache = { light: null, dark: null };
 function framesFor(scheme) {
   if (!frameCache[scheme]) {
@@ -225,6 +230,9 @@ export class Engine {
     if (this.observer) this.observer.observe(dom.stage);
     this.applyScheme(this.scheme);
     this.reset();
+    const reduceMotion = typeof window !== 'undefined' && window.matchMedia
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (this.callbacks.intro && !reduceMotion) this.startIntro();
     this.start();
   }
 
@@ -304,10 +312,39 @@ export class Engine {
       this.raf = requestAnimationFrame(loop);
       const dt = Math.min(0.05, Math.max(0, (now - this.last) / 1000));
       this.last = now;
-      if (!this.paused && this.phase === 'running') this.update(dt);
+      if (!this.paused) {
+        if (this.phase === 'running') this.update(dt);
+        else if (this.phase === 'intro') this.updateIntro(dt);
+      }
       this.render();
     };
     this.raf = requestAnimationFrame(loop);
+  }
+
+  /** Road-reveal intro: no input, no spawning; CSS animates the ground. */
+  startIntro() {
+    this.phase = 'intro';
+    this.introElapsed = 0;
+    this.dom.root.dataset.srPhase = 'intro';
+    this.dom.root.dataset.srIntro = '1';
+    this.frameIndex = 0;
+    this.frameClock = 0;
+    if (this.dom.runner && this.items && this.items[0]) this.dom.runner.src = this.items[0].src;
+    if (this.callbacks.onPhase) this.callbacks.onPhase('intro');
+  }
+
+  updateIntro(dt) {
+    this.introElapsed += dt;
+    if (this.introElapsed < INTRO_TOTAL) return;
+    delete this.dom.root.dataset.srIntro;
+    this.phase = 'running';
+    this.dom.root.dataset.srPhase = 'running';
+    this.elapsed = 0;
+    this.lastScorePaint = 0;
+    this.lastPowerPaint = 0;
+    this.frameClock = 0;
+    this.frameIndex = 0;
+    if (this.callbacks.onPhase) this.callbacks.onPhase('running');
   }
 
   pause() { this.paused = true; }

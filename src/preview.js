@@ -9,6 +9,7 @@
  *   ?hazard=1           spawn one hanging bamboo obstacle (for screenshots)
  *   ?power=1            activate the star power-up before reporting
  *   ?buff=double|magnet|slow  activate one dessert buff before reporting
+ *   ?intro=1            play the level intro (road unrolls left -> right)
  *   ?at=3200            ms after which the state is written to #out
  */
 import { ASSETS } from './generated/assets.js';
@@ -94,7 +95,7 @@ const engine = new Engine({
   power: document.getElementById('power'),
   shadeTitle: null,
   shadeSub: null,
-}, { onPhase: () => {} });
+}, { intro: params.get('intro') === '1', onPhase: () => {} });
 engine.applyScheme(scheme);
 
 // Minimal keyboard controls so the preview can be driven by hand too.

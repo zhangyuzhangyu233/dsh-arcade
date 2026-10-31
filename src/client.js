@@ -6,7 +6,7 @@
  * directly above the input card instead of floating over the conversation.
  * Clicking the shaking whale tail next to "深度求索中" toggles the game.
  */
-import { gameOpen, themeScheme } from './state.js';
+import { agentRunning, gameOpen, themeScheme } from './state.js';
 import { ping } from './ping.js';
 import { injectStyle } from './styles.js';
 import { createGamePanel } from './panel.js';
@@ -26,19 +26,6 @@ function schemeOf(ctx) {
   try {
     return window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
   } catch { return 'dark'; }
-}
-
-/** True only for a click on the running indicator's whale icon. */
-function tailClicked(target) {
-  if (!target || typeof target.closest !== 'function') return false;
-  const running = target.closest('[data-chat-running]');
-  if (!running) return false;
-  const icon = running.querySelector('[class*="_runningIcon"]');
-  if (icon && icon.contains(target)) return true;
-  // Class hashes are build-specific: fall back to the still whale SVG's box.
-  const still = running.querySelector('svg');
-  const holder = still && still.parentElement;
-  return Boolean(holder && holder.contains(target));
 }
 
 /* ------------------------------------------------------------------ *
@@ -129,19 +116,28 @@ function factory(require) {
         syncTheme();
         ctx.effect(() => ctx.on('theme/change', syncTheme), 'dsh-arcade: theme listener');
 
-        const onClick = (event) => {
-          if (!tailClicked(event.target)) return;
-          gameOpen.set(!gameOpen.get());
+        // Track "深度求索中" and hide that host row while the game is expanded,
+        // so the road/game occupies the space right above the input box alone.
+        const syncRunning = () => {
+          const runningRow = document.querySelector('[data-chat-running]');
+          agentRunning.set(Boolean(runningRow));
+          if (!runningRow) return;
+          const hidden = gameOpen.get();
+          runningRow.style.visibility = hidden ? 'hidden' : '';
+          runningRow.style.pointerEvents = hidden ? 'none' : '';
         };
+        const runningObserver = new MutationObserver(syncRunning);
+        runningObserver.observe(document.body, { childList: true, subtree: true });
+        const stopOpenWatch = gameOpen.subscribe(syncRunning);
         ctx.effect(() => {
-          document.addEventListener('click', onClick, true);
-          return () => document.removeEventListener('click', onClick, true);
-        }, 'arcade: whale tail click');
+          syncRunning();
+          return () => { runningObserver.disconnect(); stopOpenWatch(); };
+        }, 'dsh-arcade: running state');
 
         const onError = (event) => {
           const text = String((event && (event.message || event.reason)) || '');
           const file = String((event && event.filename) || '');
-          if (!/arcade/i.test(text) && !/arcade/i.test(file)) return;
+          if (!/arcade|running-maid/i.test(text) && !/arcade|running-maid/i.test(file)) return;
           ping(BUILD, { error: text.slice(0, 400) });
         };
         ctx.effect(() => {
@@ -176,7 +172,8 @@ function factory(require) {
     };
 }
 
-// The same bundle registers under both the published scoped package name and the
-// local development profile id, so one artifact works in either installation.
-const CLIENT_IDS = ['@kennielearngames/dsh-arcade', 'dsh-sushi-run'];
-for (const id of CLIENT_IDS) window.__ModuleLoader__.load({ id, factory });
+// The browser module id must equal the published package name.
+window.__ModuleLoader__.load({
+  id: '@kennielearngames/dsh-arcade',
+  factory,
+});

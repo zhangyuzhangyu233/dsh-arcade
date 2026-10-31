@@ -14,12 +14,44 @@ export const CSS = `
   position:relative;box-sizing:border-box;width:100%;max-width:100%;height:${PANEL_HEIGHT}px;
   margin:0 auto;border-radius:16px;overflow:hidden;pointer-events:auto;user-select:none;-webkit-user-select:none;
   border:1px solid var(--sr-line);background:var(--sr-bg);color:var(--sr-fg);
-  box-shadow:0 10px 30px rgba(0,0,0,.18);font-family:inherit;-webkit-app-region:no-drag}
+  box-shadow:0 10px 30px rgba(0,0,0,.18);font-family:inherit;-webkit-app-region:no-drag;
+  animation:sr-root-in .26s ease-out}
+/* Entry: a free-floating running maid pinned to the left of the input box,
+   with no card/scrim over the page. */
+.sr-root[data-sr-mode=entry]{position:fixed;z-index:40;width:auto;height:auto;background:transparent;
+  border:none;box-shadow:none;padding:0;overflow:visible;animation:none;cursor:pointer;pointer-events:auto}
+.sr-root[data-sr-mode=entry] .sr-entry{position:relative;display:flex;align-items:flex-end;overflow:visible}
+.sr-entry-maid{display:block;height:78px;width:auto;image-rendering:pixelated;
+  filter:drop-shadow(0 2px 0 rgba(0,0,0,.14))}
+.sr-root[data-sr-mode=game]{border:none;box-shadow:none;background:transparent}
+.sr-root[data-sr-mode=game] .sr-stage{border-radius:0;background:var(--sr-bg)}
 .sr-root[data-scheme=dark]{--sr-bg:#232324;--sr-fg:#f9fafb;--sr-muted:#adb2b8;--sr-line:rgba(255,255,255,.18);--sr-soft:rgba(255,255,255,.07)}
 .sr-stage{position:absolute;inset:0;overflow:hidden;border-radius:16px}
 .sr-ground{position:absolute;left:0;right:0;bottom:${GROUND_OFFSET}px;height:1.5px;background:var(--sr-line)}
 .sr-ground2{position:absolute;left:0;right:0;bottom:${GROUND_OFFSET - 5}px;height:1px;opacity:.5;
   background:repeating-linear-gradient(90deg,var(--sr-line) 0 9px,transparent 9px 26px)}
+/* Level intro: the road unrolls from left to right, then the maid starts. */
+.sr-root[data-sr-intro='1'] .sr-ground,
+.sr-root[data-sr-intro='1'] .sr-ground2{
+  clip-path:inset(0 100% 0 0);
+  animation:sr-road-reveal .42s .06s cubic-bezier(.16,1,.3,1) forwards;
+}
+@keyframes sr-road-reveal{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+.sr-root[data-sr-intro='1'] .sr-head{opacity:0;animation:sr-head-in .24s .42s ease-out forwards}
+@keyframes sr-head-in{to{opacity:1}}
+@keyframes sr-root-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* Running-indicator entry: the maid replaces the host's whale tail while a turn streams. */
+.sr-tail-maid{width:98px;height:78px;max-width:none;max-height:none;object-fit:contain;
+  margin:-27px 2px -27px 0;vertical-align:middle;flex:0 0 auto;
+  image-rendering:pixelated;cursor:pointer;transform-origin:50% 100%}
+.sr-tail-maid:active{transform:translateY(1px)}
+.sr-tail-maid:hover{filter:drop-shadow(0 0 3px rgba(255,214,120,.85))}
+@media (prefers-reduced-motion: reduce){
+  .sr-root{animation:none}
+  .sr-root[data-sr-intro='1'] .sr-ground,
+  .sr-root[data-sr-intro='1'] .sr-ground2{animation:none;clip-path:none}
+  .sr-root[data-sr-intro='1'] .sr-head{animation:none;opacity:1}
+}
 .sr-runner{position:absolute;bottom:${GROUND_OFFSET - 1}px;left:${RUNNER_X}px;height:${RUNNER_H}px;width:auto;
   pointer-events:none;transform-origin:50% 100%}
 .sr-root[data-sr-phase=over] .sr-runner{opacity:.45}

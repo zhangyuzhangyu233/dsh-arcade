@@ -3,9 +3,10 @@
  * directly above the input card) and mounts the stage DOM for the engine.
  */
 import { ASSETS } from './generated/assets.js';
+import { ENTRY_MAID } from './generated/entry-maid.js';
 import { BASE_SPEED, Engine, speedKmh } from './engine.js';
 import { ping } from './ping.js';
-import { gameOpen, phaseStore, readBest, themeScheme } from './state.js';
+import { agentRunning, gameOpen, phaseStore, readBest, themeScheme } from './state.js';
 import { BUILD } from './version.js';
 
 export function createGamePanel(React) {
@@ -31,10 +32,12 @@ export function createGamePanel(React) {
 
   function GamePanelImpl() {
     const [open, setOpen] = React.useState(gameOpen.get());
+    const [running, setRunning] = React.useState(agentRunning.get());
     const [scheme, setScheme] = React.useState(themeScheme.get());
     const [phase, setPhase] = React.useState(phaseStore.get());
 
     React.useEffect(() => gameOpen.subscribe(setOpen), []);
+    React.useEffect(() => agentRunning.subscribe(setRunning), []);
     React.useEffect(() => themeScheme.subscribe(setScheme), []);
     React.useEffect(() => phaseStore.subscribe(setPhase), []);
     React.useEffect(() => { ping(BUILD, { event: 'panel-mounted', open: gameOpen.get() }); }, []);
@@ -56,12 +59,14 @@ export function createGamePanel(React) {
     const shadeTitleRef = React.useRef(null);
     const shadeSubRef = React.useRef(null);
     const engineRef = React.useRef(null);
+    const entryMaidRef = React.useRef(null);
 
     const close = React.useCallback(() => { gameOpen.set(false); }, []);
 
-    // Match the input card's width exactly, wherever the dock is wider.
+    // Expanded game matches the input card's width. The closed entry is a
+    // free-floating maid pinned just left of the input card (no card/scrim).
     React.useEffect(() => {
-      if (!open) return undefined;
+      if (!open && !running) return undefined;
       const rootEl = rootRef.current;
       const card = document.querySelector('[data-composer-card]');
       if (!rootEl) return undefined;
@@ -69,6 +74,21 @@ export function createGamePanel(React) {
         if (!card) return;
         const cardRect = card.getBoundingClientRect();
         if (cardRect.width <= 240) return;
+        if (!gameOpen.get()) {
+          const width = 98;
+          const left = Math.max(8, Math.round(cardRect.left - width - 10));
+          const top = Math.round(cardRect.top + cardRect.height - 78 - 10);
+          rootEl.style.position = 'fixed';
+          rootEl.style.left = `${left}px`;
+          rootEl.style.top = `${top}px`;
+          rootEl.style.width = 'auto';
+          rootEl.style.maxWidth = 'none';
+          rootEl.style.marginLeft = '0px';
+          return;
+        }
+        rootEl.style.position = '';
+        rootEl.style.left = '';
+        rootEl.style.top = '';
         rootEl.style.width = `${Math.round(cardRect.width)}px`;
         rootEl.style.maxWidth = '100%';
         // The dock spans the whole composer seat; centre the stage exactly on
@@ -89,7 +109,7 @@ export function createGamePanel(React) {
         if (observer) observer.disconnect();
         window.removeEventListener('resize', sync);
       };
-    }, [open]);
+    }, [open, running]);
 
     React.useEffect(() => {
       if (!open) return undefined;
@@ -114,7 +134,7 @@ export function createGamePanel(React) {
       if (!dom.root || !dom.stage || !dom.runner) return undefined;
       let engine;
       try {
-        engine = new Engine(dom, { onPhase: (next) => phaseStore.set(next) });
+        engine = new Engine(dom, { intro: true, onPhase: (next) => phaseStore.set(next) });
       } catch (error) {
         ping(BUILD, { event: 'engine-error', error: String((error && error.stack) || error).slice(0, 900) });
         return undefined;
@@ -213,7 +233,55 @@ export function createGamePanel(React) {
       if (engineRef.current) engineRef.current.applyScheme(scheme);
     }, [scheme]);
 
-    if (!open) return null;
+    // Closed-but-streaming: a small road strip above the input, with the maid
+    // running on it. Clicking it expands the same strip into the game.
+    React.useEffect(() => {
+      if (open || !running) return undefined;
+      let raf = 0;
+      let last = 0;
+      let index = 0;
+      const step = (now) => {
+        raf = requestAnimationFrame(step);
+        if (now - last < 20) return;
+        last = now;
+        const frames = ENTRY_MAID[scheme].frames;
+        index = (index + 1) % frames.length;
+        if (entryMaidRef.current) entryMaidRef.current.src = frames[index];
+      };
+      raf = requestAnimationFrame(step);
+      return () => cancelAnimationFrame(raf);
+    }, [open, running, scheme]);
+
+    if (!open && !running) return null;
+
+    if (!open) {
+      const openGame = (event) => {
+        event.stopPropagation();
+        gameOpen.set(true);
+      };
+      return h('div', {
+        ref: rootRef,
+        className: 'sr-root sr-entry-root',
+        style: { color: scheme === 'dark' ? '#f9fafb' : '#0f1115' },
+        'data-arcade': 'stage',
+        'data-scheme': scheme,
+        'data-sr-mode': 'entry',
+        role: 'button',
+        'aria-label': '点击开始 dsh-arcade',
+        onPointerDown: openGame,
+        onMouseDown: (event) => event.stopPropagation(),
+        onClick: openGame,
+      },
+      h('div', { className: 'sr-entry' },
+        h('img', {
+          ref: entryMaidRef,
+          className: 'sr-entry-maid',
+          alt: '',
+          draggable: false,
+          src: ENTRY_MAID[scheme].frames[0],
+        }),
+      ));
+    }
 
     const tap = (event) => {
       event.stopPropagation();
@@ -232,6 +300,7 @@ export function createGamePanel(React) {
       },
       'data-arcade': 'stage',
       'data-scheme': scheme,
+      'data-sr-mode': 'game',
       'data-sr-phase': phase,
       role: 'application',
       'aria-label': 'dsh-arcade 小游戏',

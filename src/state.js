@@ -21,6 +21,8 @@ export function createStore(initial) {
 export const gameOpen = createStore(false);
 export const themeScheme = createStore('dark');
 export const phaseStore = createStore('running');
+/** True while the host is streaming a turn ("深度求索中" indicator is present). */
+export const agentRunning = createStore(false);
 
 const BEST_KEY = 'dsh-arcade.best';
 
