@@ -30,6 +30,9 @@
   "engines": {
     "node": ">=22"
   },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  },
   "publishConfig": {
     "access": "public"
   },

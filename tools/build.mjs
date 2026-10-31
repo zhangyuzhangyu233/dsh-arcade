@@ -1,17 +1,30 @@
 // Bundle src/client.js into the browser bundle the host serves at /plugins.
-// esbuild is borrowed from the local code-ripple-background checkout; set
-// ESBUILD to another entry point to build elsewhere.
+// Resolves esbuild from this package's node_modules (or $ESBUILD); a local art
+// checkout fallback keeps the author's machine working without npm install.
 //
 //   node tools/build.mjs             production build
 //   node tools/build.mjs --selftest  diagnostic build that drives one
 //                                    end-to-end self test in the open GUI
 import { spawnSync } from 'node:child_process';
 import { existsSync, statSync, utimesSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+
+const require = createRequire(import.meta.url);
+
+function localEsbuild() {
+  try {
+    return join(dirname(require.resolve('esbuild/package.json')), 'bin', 'esbuild');
+  } catch {
+    return null;
+  }
+}
 
 const SELF_TEST = process.argv.includes('--selftest');
 
 const CANDIDATES = [
   process.env.ESBUILD,
+  localEsbuild(),
   'C:/Users/zy134/Desktop/dsh-claudelike/code-ripple-background/node_modules/esbuild/bin/esbuild',
 ];
 
