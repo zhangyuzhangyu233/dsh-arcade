@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="640" viewBox="0 0 1440 640" fill="none">
+  <title>Enemy interceptor — white line art</title>
+  <desc>White outline of the enemy aircraft used in STAR ARC, viewed facing the camera. Transparent background. No glow, shadow, lock-on reticle, health indicator, or embedded image.</desc>
+  <g id="enemy-airframe" transform="translate(720 340)" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path id="silhouette" d="M0-249.4 150-43 460-21.5 550 146.2 180 64.5 0 215-180 64.5-550 146.2-460-21.5-150-43Z"/>
+    <path id="cockpit-frame" d="M-130-51.6 0 98.9 130-51.6"/>
+    <path id="wing-panels" d="M-440 38.7-240 17.2M440 38.7 240 17.2"/>
+    <circle id="central-core" r="12"/>
+  </g>
+</svg>

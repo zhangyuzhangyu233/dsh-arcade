@@ -1,6 +1,6 @@
 {
   "meta": {
     "title": "dsh-arcade",
-    "description": "Pixel-art arcade for DeepSeek Harness: click the whale tail while the model is thinking and play a 30-second run above your composer."
+    "description": "Arcade games for DeepSeek Harness: a pixel sushi runner or a wireframe deep-space fighter, launched from the entry left of the composer; switch games in Settings."
   }
 }

@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="1000" viewBox="0 0 1800 1000" fill="none">
+  <title>Oblivion boss — simplified white line art</title>
+  <desc>Heavy enemy boss with a massive crescent silhouette, thick shoulders, three large weapon apertures and an armored forward keel. Restrained internal detail, pure white outlines, transparent background.</desc>
+  <g id="boss-airframe" stroke="#FFFFFF" stroke-width="7" stroke-linecap="round" stroke-linejoin="round">
+    <path id="silhouette" d="M900 120 841 154 809 246 772 310 742 359 652 284 551 260 497 174 464 181 443 286 320 315 190 369 115 439 143 519 273 570 315 626 504 659 603 638 665 709 756 654 800 782 900 876 1000 782 1044 654 1135 709 1197 638 1296 659 1485 626 1527 570 1657 519 1685 439 1610 369 1480 315 1357 286 1336 181 1303 174 1249 260 1148 284 1058 359 1028 310 991 246 959 154Z"/>
+    <path id="central-armor" d="M809 246 831 320 786 414 762 523 780 633 826 690 851 782 900 831 949 782 974 690 1020 633 1038 523 1014 414 969 320 991 246" stroke-width="4.5"/>
+    <path id="command-bridge" d="M900 159 855 188 844 236 900 268 956 236 945 188Z" stroke-width="5"/>
+    <path id="wing-panels" d="M180 439 320 347 438 323 507 288 633 309 738 393M1620 439 1480 347 1362 323 1293 288 1167 309 1062 393" stroke-width="4.5"/>
+    <path id="lower-wing-seams" d="M193 462 287 508 407 527M339 581 502 615 593 596 662 653M1607 462 1513 508 1393 527M1461 581 1298 615 1207 596 1138 653" stroke-width="4.5"/>
+    <g id="paired-heavy-weapons" stroke-width="5">
+      <path d="M506 391 598 388 654 438 663 520 606 573 510 579 452 529 448 446Z"/>
+      <circle cx="558" cy="483" r="43"/>
+      <path d="M1294 391 1202 388 1146 438 1137 520 1194 573 1290 579 1348 529 1352 446Z"/>
+      <circle cx="1242" cy="483" r="43"/>
+    </g>
+    <g id="main-siege-cannon" stroke-width="5.5">
+      <path d="M850 395H950L1030 450 1040 582 968 655H832L760 582 770 450Z"/>
+      <circle cx="900" cy="527" r="84"/>
+      <circle cx="900" cy="527" r="56" stroke-width="4"/>
+    </g>
+    <path id="forward-keel" d="M870 704H930L942 756 900 797 858 756Z" stroke-width="4.5"/>
+  </g>
+</svg>

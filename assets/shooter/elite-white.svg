@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1440" height="720" viewBox="0 0 1440 720" fill="none">
+  <title>Elite interceptor — simplified white line art</title>
+  <desc>Front-facing elite enemy fighter. A clear swept silhouette, short canted fins, two weapon pods and one small central core. Pure white outlines on a transparent background.</desc>
+  <g id="elite-airframe" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+    <path id="silhouette" d="M720 205 668 281 624 347 513 320 478 218 456 224 469 334 163 378 105 426 286 465 428 441 473 490 606 478 657 521 720 573 783 521 834 478 967 490 1012 441 1154 465 1335 426 1277 378 971 334 984 224 962 218 927 320 816 347 772 281Z"/>
+    <path id="central-body" d="M656 350 635 406 653 467 720 535 787 467 805 406 784 350" stroke-width="4.5"/>
+    <path id="cockpit" d="M720 239 684 290 671 343 720 375 769 343 756 290Z" stroke-width="4.5"/>
+    <path id="wing-panels" d="M181 395 290 444 425 423M1259 395 1150 444 1015 423" stroke-width="4"/>
+    <g id="paired-weapons" stroke-width="4.5">
+      <path d="M463 379 502 375 531 403 534 440 505 465 467 459 443 429 446 398Z"/>
+      <circle cx="489" cy="421" r="19"/>
+      <path d="M977 379 938 375 909 403 906 440 935 465 973 459 997 429 994 398Z"/>
+      <circle cx="951" cy="421" r="19"/>
+      <path d="M489 465V482M951 465V482"/>
+    </g>
+    <circle id="central-core" cx="720" cy="420" r="19" stroke-width="4.5"/>
+  </g>
+</svg>

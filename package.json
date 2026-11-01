@@ -1,7 +1,7 @@
 {
   "name": "@kennielearngames/dsh-arcade",
-  "version": "0.2.0",
-  "description": "🕹️ dsh-arcade — a pixel-art arcade that lives above your DeepSeek Harness composer. Click the whale tail while the model is thinking and play a quick run: sushi, whale tokens, crabs, bamboo and cliff pits.",
+  "version": "0.3.0",
+  "description": "🕹️ dsh-arcade — a two-game arcade that lives around your DeepSeek Harness composer: a pixel sushi runner and a wireframe deep-space fighter, with rewards, bosses and settings-based game switching.",
   "type": "module",
   "main": "index.js",
   "author": "zhangyuzhangyu233",
@@ -23,9 +23,14 @@
     "pixel-art",
     "game",
     "runner",
+    "shooter",
+    "vector",
+    "3d",
+    "buffs",
     "browser-game",
     "街机",
-    "小游戏"
+    "小游戏",
+    "射击"
   ],
   "engines": {
     "node": ">=22"
@@ -41,7 +46,8 @@
     "build:powerups": "node tools/build-powerups.mjs",
     "check": "node tools/check-engine.mjs",
     "build:selftest": "node tools/build.mjs --selftest",
-    "banner": "python tools/make-banner.py"
+    "banner": "python tools/make-banner.py",
+    "build:shooter": "node tools/build-shooter.mjs"
   },
   "exports": {
     ".": "./index.js",

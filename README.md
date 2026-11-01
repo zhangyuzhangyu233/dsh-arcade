@@ -4,7 +4,9 @@
 
 ### 等待模型思考的同时，何不来上一把？
 
-给 **DeepSeek Harness** 的像素街机小游戏插件。模型开始思考时，输入框左侧会出现一个**跑动的小女仆**——点她，道路从左往右铺开，输入框上方直接开始一局：跑酷、吃寿司、踩小螃蟹、躲竹子和深坑。**一局 30 秒、随时关掉、不耽误你回来。**
+给 **DeepSeek Harness** 的街机小游戏插件。模型开始思考时，输入框左侧会出现入口——点它，输入框上方直接开一局：可以跑寿司、踩小螃蟹、躲竹子，也可以开线框战机在深空里迎击敌机、捡奖励、打 BOSS。**随时关掉、不耽误你回来。**
+
+现在包含两款游戏，**在 DSH 设置里的 `dsh-arcade` 分区切换**，选择会保存在本地。
 
 [![npm](https://img.shields.io/npm/v/@kennielearngames/dsh-arcade?color=ff4d6d)](https://www.npmjs.com/package/@kennielearngames/dsh-arcade)
 [![license](https://img.shields.io/badge/license-MIT-3b82f6)](LICENSE)
@@ -16,15 +18,12 @@
 
 | | |
 |---|---|
-| 👧 **入口小女仆 + 铺路开场** | 模型思考时输入框左侧出现跑动的小女仆；点她，道路从左往右铺开，铺满后她才起跑；开局不再弹出圆角小窗。 |
-| 🏃 **30 秒一局** | 无尽跑酷，速度从 20 爬到 200 km/h；关掉即结束，最高分留在本地。 |
-| 🍣 **会吃的都在这里** | 白饭、饭团、寿司、拉面、蛋包饭；苹果加速、蛋糕双倍、冰淇淋磁铁、圣代永久护盾。 |
-| 🪙 **Token 硬币 & 鲸元券** | 硬币成串出现（5–8 枚一组），每枚 +5，整组吃光再 +40；鲸元券稀有 +200，并把周围的拾取物和陷阱变成双倍分值美食。 |
-| 🐼 **竹子要蹲、尖刺要跳** | 从顶部垂下的竹子会真的挡住你——要么 ↓/S 下蹲钻过去，要么被绊倒；尖刺和垂直崖壁深坑只能跳。 |
-| 🦀 **Claude Code 小螃蟹** | 从地面爬过来，踩它 +100 并弹起；无敌状态撞上「创飞 +80」；正面裸撞就结束。 |
-| ⭐ **无敌星** | 55% 概率出现，10 秒无敌，撞谁创谁。 |
-| 🌗 **双主题像素风** | 浅色黑线稿 / 深色白线稿实时切换；所有图标同尺寸、黑白同位图，不闪不跳。 |
-| ⚡ **零依赖、即开即玩** | 纯 DOM/CSS 渲染，无 canvas、无音效、无外部请求；打开面板才跑循环，关闭立刻释放。 |
+| 👧 **入口女仆 / 战机** | 模型思考时输入框左侧出现当前游戏入口：小女仆或线框战机；在 **DSH 设置 → `dsh-arcade`** 里切换，选择保存在本地。 |
+| 🏃 **寿司跑酷** | 无边跑酷，速度 20 → 200 km/h；寿司、硬币、鲸元券、竹子、尖刺、坑、小螃蟹、无敌星。 |
+| 🚀 **深空突袭** | 半圆轨道线框射击：自动开火、敌机/精英/BOSS、HP 与血条、概率掉落 8 种永久/叠层奖励、BOSS 蓄力激光。 |
+| 🎁 **奖励道具** | 双弹道、三弹道、伤害（可叠 3 层）、射速（可叠 3 层）、穿透、护盾（破前永久）、修复、清屏。 |
+| 🌗 **双主题** | 浅色黑线稿 / 深色白线稿实时切换；两款游戏共用入口与主题。 |
+| ⚡ **零依赖** | 纯 DOM/CSS + Canvas 渲染，无音效、无外部请求；打开面板才跑循环，关闭立即释放。 |
 
 **不抢输入焦点、不弹窗、不发网络请求。** 就是一小块能让你在等待时松口气的街机厅。
 
@@ -45,7 +44,7 @@
 ```json
 {
   "dependencies": {
-    "@kennielearngames/dsh-arcade": "^0.2.0"
+    "@kennielearngames/dsh-arcade": "^0.3.0"
   },
   "dsh": {
     "profile": {
@@ -65,15 +64,32 @@ dsh plugin --profile desktop add @kennielearngames/dsh-arcade
 
 ## 🎮 玩法
 
-开始一个任务，等模型开始思考时，**点输入框左侧跑动的小女仆**：道路从左往右铺开，铺完后小女仆起跑，输入框上方直接开始游戏（不再是圆角小窗，也不影响输入框使用）。鲸鱼尾巴不再作为入口。
+开始一个任务，等模型开始思考时，**点输入框左侧的当前游戏入口**（小女仆或战机），输入框上方直接开始游戏，不影响输入框使用。
+
+**切换游戏**：DSH 设置 → `dsh-arcade` 分区，选「寿司跑酷 / 深空突袭」。入口会立刻换成对应图标；选择保存在 `localStorage`。
+
+### 寿司跑酷
 
 | 操作 | 作用 |
 |---|---|
 | `空格` / `↑` / `W` / 点击游戏区 | 跳跃（跳尖刺、跳坑、踩螃蟹） |
 | `↓` / `S` | 下蹲 / 滑铲（钻竹子；空中按会快速下落） |
-| `Esc` / 右上角 × | 关闭游戏（关闭后若模型仍在思考，小女仆会回到输入框左侧） |
+| `Esc` / 右上角 × | 关闭游戏（关闭后若模型仍在思考，入口会回到输入框左侧） |
 
-小提示：竹子只能蹲过去，跳跃会撞头；螃蟹要**落下去踩**，从下面跑过去会撞上；小螃蟹比世界速度快一点，记得提前起跳。
+小提示：竹子只能蹲过去，跳跃会撞头；螃蟹要**落下去踩**，从下面跑过去会撞上。
+
+### 深空突袭
+
+| 操作 | 作用 |
+|---|---|
+| `←` / `→` / `A` / `D` | 沿半圆轨道左右移动，机体会随之压弯 |
+| 自动开火 | 从机头持续射击，无需按键 |
+| `Esc` / 右上角 × | 关闭游戏 |
+
+- 玩家 HP 100；小兵 / 精英 / BOSS 血量各自不同；击坠会概率掉奖励。
+- 奖励：双弹道、三弹道、伤害（3 层）、射速（3 层）、穿透、护盾、修复、清屏。
+- BOSS 会瞄准、侧移/后退躲避，并蓄力发射大范围激光。
+
 
 ## 🧩 项目结构
 
@@ -84,9 +100,12 @@ dsh-arcade/
 ├─ cordis.patch.yml      # 把插件行插入 DSH profile
 ├─ src/
 │  ├─ engine.js          # 跑酷引擎：物理、生成器、金币/鲸元券、竹子/尖刺/坑/小螃蟹
+│  ├─ shooter.js         # 深空突袭：半圆轨道、HP/奖励/BOSS AI/激光
+│  ├─ settings.js        # DSH 设置里的 dsh-arcade 游戏选择分区
 │  ├─ panel.js           # React 面板 + HUD + 键鼠输入
 │  ├─ styles.js          # 全部 CSS（sr- 前缀，明暗主题 token）
 │  └─ client.js          # 插件接线：思考状态监听、slot 注册、主题同步、入口女仆
+├─ assets/shooter/       # 战机/敌机/BOSS/奖励图标线稿（黑白双主题）
 ├─ assets/branding/      # 像素海岸背景、像素标题、生成的 Banner
 ├─ tools/                # 构建、素材烘焙、Banner、无浏览器断言
 └─ preview/              # 离线预览页（不依赖 DSH）
@@ -129,8 +148,10 @@ python tools/make-banner.py
 
 dsh-arcade 不打算只做一款游戏。路线是把它变成 DSH 里的「街机架」：
 
-- [x] v0.1 寿司跑酷（当前版本）
-- [ ] Arcade Shell：多游戏切换、统一 HUD / 最高分 / 每日挑战
+- [x] v0.1 寿司跑酷
+- [x] v0.2 入口女仆 / 铺路开场 / 无边框游戏区
+- [x] v0.3 深空突袭（线框战机、奖励道具、BOSS 激光）+ DSH 设置内切换游戏
+- [ ] Arcade Shell：统一 HUD / 最高分 / 每日挑战
 - [ ] 敲 Token（打地鼠式点击小游戏）
 - [ ] 接寿司 / 寿司蛇
 - [ ] Token Breakout、弹幕「深度求索中」
@@ -148,6 +169,6 @@ dsh-arcade 不打算只做一款游戏。路线是把它变成 DSH 里的「街�
 
 ### English
 
-**dsh-arcade** is a tiny pixel-art arcade for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). While the model is thinking, click the whale tail next to the composer and play a quick endless runner right above your input box: sushi pickups, whale-token coin trails, a one-time banknote that turns traps into food, invincible stars, ground crabs to stomp, spikes, bamboo you must duck under, and bottomless cliff pits.
+**dsh-arcade** is a two-game arcade for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness). While the model is thinking, click the entry left of the composer: play a pixel sushi runner (sushi, whale-token coin trails, crabs, bamboo, spikes, pits), or a wireframe deep-space fighter (HP, elites, a dodging laser boss, eight reward pickups). Switch games under **Settings → `dsh-arcade`**; scores and the selection stay local. Pure DOM/CSS + Canvas, no audio, no network requests. Code is MIT licensed; fan project, not affiliated with Anthropic or DeepSeek.
 
-Runs for as long as you want, ends the moment you close it, and stores best scores locally. Pure DOM/CSS, no canvas, no audio, no network requests. Code is MIT licensed; fan project, not affiliated with Anthropic or DeepSeek.
+Runs for as long as you want, ends the moment you close it, and stores best scores and the selected game locally. Code is MIT licensed; fan project, not affiliated with Anthropic or DeepSeek.

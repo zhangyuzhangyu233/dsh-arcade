@@ -35,6 +35,10 @@ if (!esbuild) {
 }
 
 // Regenerate the themed power-up data URIs first (tiny, no dependencies).
+// Regenerate the inline shooter SVG / themed enemy art first.
+const shooter = spawnSync(process.execPath, ['tools/build-shooter.mjs'], { stdio: 'inherit' });
+if (shooter.status !== 0) process.exit(shooter.status ?? 1);
+
 const powerups = spawnSync(process.execPath, ['tools/build-powerups.mjs'], { stdio: 'inherit' });
 if (powerups.status !== 0) process.exit(powerups.status ?? 1);
 

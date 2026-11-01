@@ -10,6 +10,7 @@ import { agentRunning, gameOpen, themeScheme } from './state.js';
 import { ping } from './ping.js';
 import { injectStyle } from './styles.js';
 import { createGamePanel } from './panel.js';
+import { createSettingsPanel } from './settings.js';
 import { BUILD } from './version.js';
 
 /* Injected by tools/build.mjs: enables a one-shot end-to-end self test that
@@ -107,6 +108,7 @@ function runSelfTest(closeGame) {
 function factory(require) {
   const React = require('react');
   const GamePanel = createGamePanel(React);
+  const ArcadeSettings = createSettingsPanel(React);
   return {
       inject: ['slots', 'theme'],
       apply(ctx) {
@@ -154,6 +156,14 @@ function factory(require) {
           id: 'arcade',
           order: 80,
         }, GamePanel));
+
+        // DSH Settings → dsh-arcade: pick which mini-game the composer entry starts.
+        ctx.slots.inject('settings.section', () => ctx.slots.register({
+          name: 'settings.section',
+          id: 'dsh-arcade',
+          order: 90,
+          label: () => 'dsh-arcade',
+        }, ArcadeSettings));
 
         // Tiny dev handle, no model-facing effect.
         Object.defineProperty(window, '__DSH_ARCADE__', {

@@ -24,6 +24,19 @@ export const phaseStore = createStore('running');
 /** True while the host is streaming a turn ("深度求索中" indicator is present). */
 export const agentRunning = createStore(false);
 
+const GAME_KEY = 'dsh-arcade.game';
+
+export function readGameKind() {
+  try { return localStorage.getItem(GAME_KEY) === 'fighter' ? 'fighter' : 'runner'; } catch { return 'runner'; }
+}
+
+export function writeGameKind(kind) {
+  try { localStorage.setItem(GAME_KEY, kind === 'fighter' ? 'fighter' : 'runner'); } catch { /* private mode */ }
+}
+
+/** Which mini-game the entry opens: 'runner' (sushi run) or 'fighter'. */
+export const gameKind = createStore(typeof localStorage === 'undefined' ? 'runner' : readGameKind());
+
 const BEST_KEY = 'dsh-arcade.best';
 
 export function readBest() {

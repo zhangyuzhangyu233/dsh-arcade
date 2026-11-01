@@ -4,10 +4,13 @@
  */
 import { ASSETS } from './generated/assets.js';
 import { ENTRY_MAID } from './generated/entry-maid.js';
+import { SHOOTER } from './generated/shooter.js';
 import { BASE_SPEED, Engine, speedKmh } from './engine.js';
 import { ping } from './ping.js';
-import { agentRunning, gameOpen, phaseStore, readBest, themeScheme } from './state.js';
+import { Shooter } from './shooter.js';
+import { agentRunning, gameKind, gameOpen, phaseStore, readBest, themeScheme } from './state.js';
 import { BUILD } from './version.js';
+
 
 export function createGamePanel(React) {
   const h = React.createElement;
@@ -30,15 +33,43 @@ export function createGamePanel(React) {
     }
   }
 
+  function FighterStage(props) {
+    const hostRef = React.useRef(null);
+    const shooterRef = React.useRef(null);
+    React.useEffect(() => {
+      if (!hostRef.current) return undefined;
+      const shooter = new Shooter(hostRef.current, { scheme: props.scheme, onClose: props.close });
+      shooterRef.current = shooter;
+      ping(BUILD, { event: 'fighter-open', scheme: props.scheme });
+      return () => {
+        shooterRef.current = null;
+        shooter.destroy();
+      };
+    }, [props.scheme, props.close]);
+    return h('div', {
+      ref: props.rootRef,
+      className: 'sr-root sr-fighter-root',
+      style: { backgroundColor: props.scheme === 'dark' ? '#232324' : '#ffffff' },
+      'data-arcade': 'stage',
+      'data-scheme': props.scheme,
+      'data-sr-mode': 'game',
+      role: 'application',
+      'aria-label': 'dsh-arcade 深空突袭',
+    },
+    h('div', { ref: hostRef, className: 'sr-fighter-stage' }));
+  }
+
   function GamePanelImpl() {
     const [open, setOpen] = React.useState(gameOpen.get());
     const [running, setRunning] = React.useState(agentRunning.get());
     const [scheme, setScheme] = React.useState(themeScheme.get());
+    const [kind, setKind] = React.useState(gameKind.get());
     const [phase, setPhase] = React.useState(phaseStore.get());
 
     React.useEffect(() => gameOpen.subscribe(setOpen), []);
     React.useEffect(() => agentRunning.subscribe(setRunning), []);
     React.useEffect(() => themeScheme.subscribe(setScheme), []);
+    React.useEffect(() => gameKind.subscribe(setKind), []);
     React.useEffect(() => phaseStore.subscribe(setPhase), []);
     React.useEffect(() => { ping(BUILD, { event: 'panel-mounted', open: gameOpen.get() }); }, []);
 
@@ -75,15 +106,19 @@ export function createGamePanel(React) {
         const cardRect = card.getBoundingClientRect();
         if (cardRect.width <= 240) return;
         if (!gameOpen.get()) {
-          const width = 98;
-          const left = Math.max(8, Math.round(cardRect.left - width - 10));
-          const top = Math.round(cardRect.top + cardRect.height - 78 - 10);
           rootEl.style.position = 'fixed';
-          rootEl.style.left = `${left}px`;
-          rootEl.style.top = `${top}px`;
+          rootEl.style.left = '0px';
+          rootEl.style.top = '0px';
           rootEl.style.width = 'auto';
           rootEl.style.maxWidth = 'none';
           rootEl.style.marginLeft = '0px';
+          const rootRect = rootEl.getBoundingClientRect();
+          const width = rootRect.width || 98;
+          const height = rootRect.height || 78;
+          const left = Math.max(8, Math.round(cardRect.left - width - 10));
+          const top = Math.round(cardRect.top + cardRect.height - height - 10);
+          rootEl.style.left = `${left}px`;
+          rootEl.style.top = `${top}px`;
           return;
         }
         rootEl.style.position = '';
@@ -109,10 +144,10 @@ export function createGamePanel(React) {
         if (observer) observer.disconnect();
         window.removeEventListener('resize', sync);
       };
-    }, [open, running]);
+    }, [open, running, kind]);
 
     React.useEffect(() => {
-      if (!open) return undefined;
+      if (!open || kind !== 'runner') return undefined;
       const dom = {
         root: rootRef.current,
         stage: stageRef.current,
@@ -227,7 +262,7 @@ export function createGamePanel(React) {
         if (gameOpen.get()) gameOpen.set(false);
         ping(BUILD, { event: 'game-close' });
       };
-    }, [open, close]);
+    }, [open, kind, close]);
 
     React.useEffect(() => {
       if (engineRef.current) engineRef.current.applyScheme(scheme);
@@ -236,7 +271,7 @@ export function createGamePanel(React) {
     // Closed-but-streaming: a small road strip above the input, with the maid
     // running on it. Clicking it expands the same strip into the game.
     React.useEffect(() => {
-      if (open || !running) return undefined;
+      if (open || !running || kind !== 'runner') return undefined;
       let raf = 0;
       let last = 0;
       let index = 0;
@@ -250,7 +285,7 @@ export function createGamePanel(React) {
       };
       raf = requestAnimationFrame(step);
       return () => cancelAnimationFrame(raf);
-    }, [open, running, scheme]);
+    }, [open, running, scheme, kind]);
 
     if (!open && !running) return null;
 
@@ -259,6 +294,18 @@ export function createGamePanel(React) {
         event.stopPropagation();
         gameOpen.set(true);
       };
+      const icon = kind === 'fighter'
+        ? h('div', {
+          className: 'sr-entry-ship',
+          dangerouslySetInnerHTML: { __html: SHOOTER.playerSvg },
+        })
+        : h('img', {
+          ref: entryMaidRef,
+          className: 'sr-entry-maid',
+          alt: '',
+          draggable: false,
+          src: ENTRY_MAID[scheme].frames[0],
+        });
       return h('div', {
         ref: rootRef,
         className: 'sr-root sr-entry-root',
@@ -272,15 +319,11 @@ export function createGamePanel(React) {
         onMouseDown: (event) => event.stopPropagation(),
         onClick: openGame,
       },
-      h('div', { className: 'sr-entry' },
-        h('img', {
-          ref: entryMaidRef,
-          className: 'sr-entry-maid',
-          alt: '',
-          draggable: false,
-          src: ENTRY_MAID[scheme].frames[0],
-        }),
-      ));
+      h('div', { className: 'sr-entry' }, icon));
+    }
+
+    if (kind === 'fighter') {
+      return h(FighterStage, { scheme, close, rootRef });
     }
 
     const tap = (event) => {
