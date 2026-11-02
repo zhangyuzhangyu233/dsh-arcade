@@ -22,7 +22,7 @@ const playerSvg = readFileSync(join(SRC, 'player-black.svg'), 'utf8')
   .trim();
 
 const REWARD_DIR = join(SRC, 'rewards');
-const REWARD_IDS = ['double-shot','triple-shot','screen-clear','damage-up','fire-rate','shield','repair','piercing-laser'];
+const REWARD_IDS = ['double-shot','triple-shot','screen-clear','damage-up','fire-rate','shield','repair','piercing-laser','missile','cooldown'];
 const rewards = {};
 for (const id of REWARD_IDS) {
   rewards[id] = {

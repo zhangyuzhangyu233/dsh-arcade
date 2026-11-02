@@ -19,8 +19,11 @@ const REWARD_META = {
   shield: { name: '护盾', duration: 0 },
   repair: { name: '修复', duration: 0 },
   'piercing-laser': { name: '穿透激光', duration: 10 },
+  missile: { name: '导弹解锁', duration: 0 },
+  cooldown: { name: '反制冷却', duration: 0 },
 };
 const DROP_CHANCE = { enemy: 0.08, elite: 0.25, boss: 1 };
+const SQUAD_MODES = ['defense', 'assault', 'orbit', 'wedge', 'swarm'];
 const PICKUP_LIFE = 9;
 const PICKUP_RADIUS = 26;
 
@@ -30,12 +33,15 @@ const FIRE_COOLDOWN = 0.085;       // s
 const BULLET_SPEED = 2.6;         // z / s
 const BULLET_DAMAGE = 10;
 const MAX_HP = 100;
+const ULT_MAX = 8;
+const COUNTER_COOLDOWN = 3.0;
+const ENEMY_MISSILE_SPEED = BULLET_SPEED * 0.9;
 const BEST_KEY = 'dsh-arcade.best.fighter';
 
 const ENEMY_TYPES = {
   enemy: { maxHp: 10, damage: 20, points: 10, size: 58 },
   elite: { maxHp: 30, damage: 35, points: 30, size: 78 },
-  boss: { maxHp: 200, damage: 50, points: 200, size: 190 },
+  boss: { maxHp: 200, damage: 45, points: 200, size: 190 },
 };
 
 function clamp(v, min, max) {
@@ -91,15 +97,23 @@ export class Shooter {
     this.hud = document.createElement('div');
     this.hud.className = 'sr-fighter-hud';
     this.hud.innerHTML = ''
+      + '<div class="sr-fighter-hud-main">'
       + '<span class="sr-fighter-title">dsh-arcade</span>'
       + '<span class="sr-fighter-score">得分 <b>0</b></span>'
       + '<span class="sr-fighter-best">最高 <b>0</b></span>'
-      + '<span class="sr-fighter-hp">HP <b>100</b><i></i></span>'
-      + '<span class="sr-fighter-wave">波次 1</span>';
+      + '<span class="sr-fighter-wave">波次 1</span>'
+      + '</div>'
+      + '<div class="sr-fighter-hud-hp"><span class="sr-fighter-hp">HP <b>100</b><i></i></span></div>';
 
-    this.help = document.createElement('div');
-    this.help.className = 'sr-fighter-help';
-    this.help.textContent = '←/→ 绕圈 · 自动开火 · Esc 退出';
+    this.abilityHud = document.createElement('div');
+    this.abilityHud.className = 'sr-fighter-abilities';
+    this.abilityHud.innerHTML = ''
+      + '<span class="sr-fighter-ability sr-fighter-counter">反制 <b>就绪</b></span>'
+      + '<span class="sr-fighter-ability sr-fighter-ult">X 电磁炮 <b>未解锁</b></span>';
+
+    this.alert = document.createElement('div');
+    this.alert.className = 'sr-fighter-alert';
+    this.alert.innerHTML = '<div class="sr-fighter-alert-title"></div><div class="sr-fighter-alert-sub"></div>';
 
     this.overlay = document.createElement('div');
     this.overlay.className = 'sr-fighter-shade';
@@ -113,7 +127,7 @@ export class Shooter {
     this.closeBtn.textContent = '×';
     this.closeBtn.addEventListener('click', (event) => { event.stopPropagation(); this.onClose(); });
 
-    container.append(this.canvas, this.player, this.hud, this.buffHud, this.help, this.overlay, this.closeBtn);
+    container.append(this.canvas, this.player, this.hud, this.buffHud, this.abilityHud, this.alert, this.overlay, this.closeBtn);
     this.colors = this.scheme === 'light'
       ? { bg: '#ffffff', fg: '#0f1115', dim: 'rgba(15,17,21,.32)', star: 'rgba(15,17,21,.25)' }
       : { bg: '#232324', fg: '#f9fafb', dim: 'rgba(255,255,255,.28)', star: 'rgba(255,255,255,.26)' };
@@ -203,7 +217,17 @@ export class Shooter {
     this.fireTimer = 0;
     this.bullets = [];
     this.enemies = [];
+    this.enemyMissiles = [];
+    this.playerMissiles = [];
+    this.counterUntil = 0;
+    this.ultCharge = 0;
+    this.ultUnlocked = false;
+    this.emUntil = 0;
+    this.emAngle = 0;
+    this.runTime = 0;
     this.boss = null;
+    this.bossPendingUntil = 0;
+    this.alertUntil = 0;
     this.bossBullets = [];
     this.bossChargeUntil = 0;
     this.bossHeavyTimer = 6;
@@ -211,6 +235,8 @@ export class Shooter {
     this.laserAngle = 0;
     this.laserWidth = 0.5;
     this.laserDamage = 60;
+    this.laserStartedAt = 0;
+    this.laserFlashUntil = 0;
     this.spawnTimer = 0.7;
     this.eliteTimer = 5;
     this.waveTimer = 14;
@@ -253,6 +279,24 @@ export class Shooter {
     const hpEl = this.hud.querySelector('.sr-fighter-hp');
     if (hpEl) hpEl.style.setProperty('--hp', String(clamp(this.hp / MAX_HP, 0, 1)));
     set('.sr-fighter-wave', `波次 ${this.wave}${this.boss ? ' · BOSS' : ''}`);
+    this.updateAbilityHud();
+  }
+
+  updateAbilityHud() {
+    if (!this.abilityHud) return;
+    const counter = this.abilityHud.querySelector('.sr-fighter-counter b');
+    const ult = this.abilityHud.querySelector('.sr-fighter-ult b');
+    const now = performance.now();
+    if (counter) {
+      const remaining = (this.counterUntil || 0) - now;
+      counter.textContent = remaining > 0 ? '装填 ' + (remaining / 1000).toFixed(1) + 's' : '就绪';
+    }
+    if (ult) {
+      if (!this.ultUnlocked) ult.textContent = '未解锁';
+      else if (this.ultCharge >= ULT_MAX) ult.textContent = '就绪';
+      else ult.textContent = `${this.ultCharge}/${ULT_MAX}`;
+    }
+    if (this.abilityHud) this.abilityHud.classList.toggle('is-ult-ready', this.ultUnlocked && this.ultCharge >= ULT_MAX);
   }
 
   readBest() {
@@ -286,8 +330,12 @@ export class Shooter {
     if (key === ' ' || key === 'Spacebar') {
       event.preventDefault();
       if (down && this.phase === 'over') { this.restart(); return; }
-      if (down) this.firing = true;
-      else this.firing = false;
+      if (down) this.fireCounterMissile();
+      return;
+    }
+    if (key === 'x' || key === 'X') {
+      event.preventDefault();
+      if (down) this.fireUltimate();
       return;
     }
     if (key === 'ArrowLeft' || key === 'a' || key === 'A') {
@@ -306,6 +354,7 @@ export class Shooter {
     if (this.keys.has('left')) this.playerAngle -= ROTATE_SPEED * dt;
     if (this.keys.has('right')) this.playerAngle += ROTATE_SPEED * dt;
     this.playerAngle = clamp(this.playerAngle, -Math.PI / 2, Math.PI / 2);
+    this.runTime += dt;
 
     this.fireTimer -= dt;
     if (this.fireTimer <= 0) {
@@ -338,28 +387,58 @@ export class Shooter {
       }
       this.muzzleUntil = performance.now() + 70;
       this.muzzle = nose;
+      const missileLevel = this.buffs.missile || 0;
+      if (missileLevel > 0 && Math.random() < missileLevel * 0.08) {
+        this.spawnPlayerMissile('buff');
+      }
     }
     this.updatePickups(dt);
+    this.updatePlayerMissiles(dt);
+    this.updateEnemyMissiles(dt);
 
     for (const bullet of this.bullets) bullet.z += BULLET_SPEED * dt;
     this.bullets = this.bullets.filter((bullet) => bullet.z <= 0.98);
 
+    const diff = this.difficulty();
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0 && !this.boss) {
-      this.spawnTimer = Math.max(0.32, 1.05 - this.wave * 0.05) * (0.8 + Math.random() * 0.5);
+      this.spawnTimer = Math.max(0.24, (1.05 - this.wave * 0.055) / diff) * (0.8 + Math.random() * 0.5);
       this.spawnEnemy('enemy');
     }
     this.eliteTimer -= dt;
     if (this.eliteTimer <= 0 && !this.boss) {
-      this.eliteTimer = 6.5 + Math.random() * 3;
-      this.spawnEnemy('elite');
+      this.eliteTimer = Math.max(3.2, (7.2 - this.wave * 0.22) / diff) + Math.random() * 2;
+      this.spawnEliteSquad();
+    }
+    if (this.alertUntil && performance.now() >= this.alertUntil) {
+      this.alertUntil = 0;
+      this.alert.classList.remove('is-visible');
+    }
+    if (this.bossPendingUntil && performance.now() >= this.bossPendingUntil) {
+      this.bossPendingUntil = 0;
+      this.spawnBoss();
     }
     if (this.boss) {
       this.bossTimer += dt;
       const boss = this.boss;
+      boss.spawnAge += dt;
       const now = performance.now();
       const phase = boss.hp <= boss.maxHp * 0.5 ? 2 : 1;
       boss.phase = phase;
+      if (boss.introUntil) {
+        if (now < boss.introUntil) {
+          boss.attackTimer = 999;
+          boss.missileTimer = 999;
+          boss.dashTimer = 999;
+          boss.entryOffsetY += (0 - boss.entryOffsetY) * Math.min(1, dt * 3.2);
+        } else {
+          boss.introUntil = 0;
+          boss.entryOffsetY = 0;
+          boss.attackTimer = 1.2;
+          boss.missileTimer = 2.4;
+          boss.dashTimer = 4.8;
+        }
+      }
       boss.dodgeCooldown -= dt;
       boss.attackTimer -= dt;
       // dodge player bullets that are about to reach it, and back off in depth
@@ -370,9 +449,11 @@ export class Shooter {
       if (this.bossChargeUntil && now >= this.bossChargeUntil) {
         this.bossChargeUntil = 0;
         this.laserAngle = boss.angle;
-        this.laserWidth = phase === 2 ? 0.62 : 0.48;
-        this.laserUntil = now + (phase === 2 ? 950 : 780);
-        this.laserDamage = 60 + phase * 10;
+        this.laserWidth = phase === 2 ? 0.42 : 0.30;
+        this.laserUntil = now + (phase === 2 ? 850 : 760);
+        this.laserDamage = phase === 2 ? 85 : 70;
+        this.laserStartedAt = now;
+        this.laserFlashUntil = now + 180;
         boss.attackTimer = Math.max(boss.attackTimer, 1.2);
         const point = this.project(boss.angle, boss.z);
         this.spawnBurst(point.x, point.y, 10, 120);
@@ -380,13 +461,25 @@ export class Shooter {
         boss.angle = moveAngle(boss.angle, this.playerAngle, (0.9 + phase * 0.25) * dt);
         boss.targetZ = 0.68;
       } else if (threat && boss.dodgeCooldown <= 0) {
-        boss.targetZ = phase === 2 ? 0.78 : 0.72;
+        boss.targetZ = phase === 2 ? 0.8 : 0.74;
         const side = Math.sign(angleDelta(threat.angle, boss.angle)) || 1;
-        boss.angle = wrapAngle(boss.angle - side * 0.16);
-        boss.dodgeCooldown = phase === 2 ? 0.24 : 0.4;
+        boss.angle = wrapAngle(boss.angle - side * 0.24);
+        boss.dodgeCooldown = phase === 2 ? 0.44 : 0.62;
       } else {
         boss.targetZ = 0.55;
-        boss.angle = moveAngle(boss.angle, this.playerAngle, (0.7 + phase * 0.3) * dt);
+        const sway = Math.sin(now / 900 + boss.angle) * 0.42;
+        boss.angle = moveAngle(boss.angle, wrapAngle(this.playerAngle + sway), (0.65 + phase * 0.35) * dt);
+      }
+      boss.dashTimer -= dt;
+      if (boss.dashTimer <= 0 && !this.bossChargeUntil) {
+        boss.dashTimer = phase === 2 ? 4.0 : 5.0;
+        const lanes = [-0.95, -0.55, 0, 0.55, 0.95];
+        let lane = lanes[Math.floor(Math.random() * lanes.length)];
+        if (Math.abs(angleDelta(lane, boss.angle)) < 0.25) lane = wrapAngle(lane + 0.7);
+        boss.angle = clamp(lane, -Math.PI / 2, Math.PI / 2);
+        boss.targetZ = 0.7;
+        const point = this.project(boss.angle, boss.z);
+        this.spawnBurst(point.x, point.y, 12, 130);
       }
       boss.z += clamp((boss.targetZ || 0.55) - boss.z, -0.5 * dt, 0.5 * dt);
       boss.angle = clamp(boss.angle, -Math.PI / 2, Math.PI / 2);
@@ -396,27 +489,22 @@ export class Shooter {
         this.hitPlayer(this.laserDamage || 60);
       }
       if (!this.bossChargeUntil && !laserOn && boss.attackTimer <= 0) {
-        boss.attackTimer = (phase === 2 ? 1.15 : 1.7) + Math.random() * 0.4;
-        this.bossBullets.push({
-          angle: boss.angle,
-          z: boss.z - 0.02,
-          speed: BULLET_SPEED,
-          damage: ENEMY_TYPES.boss.damage,
-        });
-        if (phase === 2) {
-          this.bossBullets.push({
-            angle: boss.angle + 0.12,
-            z: boss.z - 0.02,
-            speed: BULLET_SPEED,
-            damage: ENEMY_TYPES.boss.damage - 10,
-          });
-        }
+        boss.attackTimer = (phase === 2 ? 0.95 : 1.2) + Math.random() * 0.3;
+        this.spawnEnemyBullet(boss.angle - 0.07, boss.z, ENEMY_TYPES.boss.damage - 10);
+        this.spawnEnemyBullet(boss.angle + 0.07, boss.z, ENEMY_TYPES.boss.damage - 10);
+        if (phase === 2) this.spawnEnemyBullet(boss.angle, boss.z, ENEMY_TYPES.boss.damage);
         boss.flashUntil = performance.now() + 80;
+      }
+      boss.missileTimer -= dt;
+      if (boss.missileTimer <= 0 && !this.bossChargeUntil && !laserOn) {
+        boss.missileTimer = phase === 2 ? 1.7 : 2.4;
+        this.spawnEnemyMissile(boss, ENEMY_TYPES.boss.damage - 10);
+        if (phase === 2) this.spawnEnemyMissile(boss, ENEMY_TYPES.boss.damage - 15);
       }
       this.bossHeavyTimer -= dt;
       if (!this.bossChargeUntil && this.bossHeavyTimer <= 0) {
-        this.bossHeavyTimer = phase === 2 ? 6 : 8.5;
-        this.bossChargeUntil = now + (phase === 2 ? 620 : 800);
+        this.bossHeavyTimer = phase === 2 ? 6.2 : 7.8;
+        this.bossChargeUntil = now + (phase === 2 ? 900 : 1100);
         this.bossChargeAngle = this.playerAngle;
       }
       if (this.bossTimer > 45) this.boss = null;
@@ -438,53 +526,136 @@ export class Shooter {
     if (this.waveTimer <= 0) {
       this.wave += 1;
       this.waveTimer = 14;
-      if (this.wave % 4 === 0 && !this.boss) this.spawnBoss();
+      if (this.wave >= 2 && !this.ultUnlocked) {
+        this.ultUnlocked = true;
+        this.spawnFloater(this.w / 2, this.h * 0.3, 'X 电磁炮解锁');
+      }
+      if (this.wave % 4 === 0 && !this.boss && !this.bossPendingUntil) this.beginBossWarning();
       this.updateHud();
     }
 
-    const speedBase = 0.16 + this.wave * 0.012;
+    const speedBase = (0.16 + this.wave * 0.012) * this.difficulty();
     for (const enemy of this.enemies) {
+      enemy.spawnAge += dt;
       enemy.wobble += dt * (enemy.type === 'elite' ? 1.4 : 2.2);
-      const point = this.project(enemy.angle, enemy.z);
       const threat = this.bullets.find((bullet) =>
         bullet.z < enemy.z && enemy.z - bullet.z < 0.32 &&
         Math.abs(angleDelta(bullet.angle, enemy.angle)) < 0.18);
       if (enemy.type === 'enemy') {
         enemy.dodgeCooldown -= dt;
         enemy.fireTimer -= dt;
-        const weave = Math.sin(enemy.wobble) * 0.16;
-        enemy.angle = moveAngle(enemy.angle, wrapAngle(this.playerAngle + weave), (0.4 + this.wave * 0.025) * dt);
-        if (threat && enemy.dodgeCooldown <= 0) {
-          const side = Math.sign(angleDelta(threat.angle, enemy.angle)) || 1;
-          enemy.angle = wrapAngle(enemy.angle - side * 0.16);
-          enemy.dodgeCooldown = 0.8;
-        }
-        enemy.z -= speedBase * enemy.speedFactor * dt;
-        if (enemy.fireTimer <= 0 && enemy.z < 0.86 && !this.boss) {
-          enemy.fireTimer = 3.4 + Math.random() * 1.8;
-          this.bossBullets.push({
-            angle: enemy.angle,
-            z: enemy.z - 0.02,
-            speed: BULLET_SPEED,
-            damage: ENEMY_TYPES.enemy.damage - 10,
-          });
+        enemy.modeTimer -= dt;
+        const captain = enemy.captainId
+          ? this.enemies.find((other) => other.id === enemy.captainId && !other.dead)
+          : null;
+        if (captain) {
+          // Two squad behaviour trees:
+          // - defense: escort screen in front of the captain, absorbing fire
+          // - assault: flank wide ahead of the captain and pressure the player
+          const mode = captain.squadMode || 'assault';
+          let formation;
+          let targetZ;
+          let ownFire = false;
+          if (mode === 'defense') {
+            formation = wrapAngle(captain.angle + (enemy.laneOffset || 0) * 0.45);
+            targetZ = Math.max(0.18, Math.min(0.92, captain.z - 0.08));
+          } else if (mode === 'orbit') {
+            formation = wrapAngle(captain.angle + Math.sin(performance.now() / 700 + (enemy.laneOffset || 0) * 5) * 0.5);
+            targetZ = Math.min(0.92, captain.z + 0.02);
+          } else if (mode === 'wedge') {
+            formation = wrapAngle(captain.angle + (enemy.laneOffset || 0) * 1.15);
+            targetZ = Math.max(0.16, captain.z - 0.15);
+          } else if (mode === 'swarm') {
+            formation = wrapAngle(this.playerAngle + (enemy.laneOffset || 0) * 2.6 + Math.sin(enemy.wobble) * 0.35);
+            targetZ = 0.2;
+            ownFire = true;
+          } else {
+            formation = wrapAngle(this.playerAngle + (enemy.laneOffset || 0) * 1.6 + Math.sin(enemy.wobble) * 0.12);
+            targetZ = Math.max(0.16, Math.min(0.72, captain.z - 0.14));
+          }
+          enemy.angle = moveAngle(enemy.angle, formation, (1.15 + this.wave * 0.02) * diff * dt);
+          enemy.z += clamp(targetZ - enemy.z, -speedBase * 0.8 * dt, speedBase * 0.8 * dt);
+          if (ownFire) {
+            enemy.fireTimer -= dt;
+            if (enemy.fireTimer <= 0 && !this.boss) {
+              enemy.fireTimer = Math.max(0.8, (2.4 - this.wave * 0.08) / diff) + Math.random() * 0.5;
+              this.spawnEnemyBullet(enemy.angle, enemy.z, ENEMY_TYPES.enemy.damage - 10);
+            }
+          } else {
+            enemy.fireTimer = 99;
+          }
+        } else {
+          if (enemy.fireTimer > 90) enemy.fireTimer = 0.8;
+          const desired = wrapAngle(this.playerAngle + (enemy.laneOffset || 0) + Math.sin(enemy.wobble) * 0.12);
+          enemy.angle = moveAngle(enemy.angle, desired, (0.75 + this.wave * 0.02) * diff * dt);
+          if (threat && enemy.dodgeCooldown <= 0) {
+            const side = Math.sign(angleDelta(threat.angle, enemy.angle)) || 1;
+            enemy.angle = wrapAngle(enemy.angle + side * 0.28);
+            enemy.dodgeCooldown = 0.9;
+          }
+          if (enemy.z > 0.34) enemy.z -= speedBase * enemy.speedFactor * dt;
+          else enemy.z += Math.sin(enemy.wobble * 1.7) * 0.015 * dt;
+          if (enemy.modeTimer <= 0) {
+            enemy.modeTimer = 2.4 + Math.random() * 2.6;
+            if (Math.random() < 0.35) enemy.diveTimer = 0.75;
+          }
+          if (enemy.diveTimer > 0) {
+            enemy.diveTimer -= dt;
+            enemy.z -= 0.22 * dt;
+          }
+          if (enemy.fireTimer <= 0 && !this.boss) {
+            enemy.fireTimer = Math.max(0.55, (2.8 - this.wave * 0.12) / diff) + Math.random() * 0.45;
+            this.spawnEnemyBullet(enemy.angle, enemy.z, ENEMY_TYPES.enemy.damage - 10);
+          }
         }
       } else if (enemy.type === 'elite') {
         enemy.fireTimer -= dt;
+        enemy.squadTimer -= dt;
+        if (!enemy.squadMode) enemy.squadMode = 'assault';
+        if (enemy.hp < enemy.maxHp * 0.4 && enemy.squadMode !== 'defense') {
+          enemy.squadMode = 'defense';
+          enemy.squadTimer = 7;
+        } else if (enemy.squadTimer <= 0) {
+          const choices = SQUAD_MODES.filter((mode) => mode !== enemy.squadMode);
+          enemy.squadMode = choices[Math.floor(Math.random() * choices.length)];
+          enemy.squadTimer = 5.5 + Math.random() * 2.5;
+        }
+        enemy.missileTimer -= dt;
         enemy.dodgeCooldown -= dt;
-        let desired = wrapAngle(this.playerAngle + Math.sin(enemy.wobble) * 0.12);
-        if (threat) desired = wrapAngle(enemy.angle + (Math.sign(angleDelta(threat.angle, enemy.angle)) || 1) * 0.45);
-        enemy.angle = moveAngle(enemy.angle, desired, (0.9 + this.wave * 0.03) * dt);
-        if (threat) enemy.z = Math.min(0.9, enemy.z + 0.28 * dt);
-        else enemy.z -= speedBase * 0.55 * dt;
-        if (enemy.fireTimer <= 0 && enemy.z < 0.82) {
-          enemy.fireTimer = 2.4 + Math.random() * 1.2;
-          this.bossBullets.push({
-            angle: enemy.angle,
-            z: enemy.z - 0.02,
-            speed: BULLET_SPEED,
-            damage: ENEMY_TYPES.elite.damage - 10,
-          });
+        let desired = wrapAngle(this.playerAngle + (enemy.laneOffset || 0) + Math.sin(enemy.wobble) * 0.08);
+        if (threat && enemy.dodgeCooldown <= 0) {
+          const side = Math.sign(angleDelta(threat.angle, enemy.angle)) || 1;
+          desired = wrapAngle(enemy.angle + side * 0.5);
+          enemy.dodgeCooldown = 0.6;
+        }
+        enemy.angle = moveAngle(enemy.angle, desired, (1.25 + this.wave * 0.03) * diff * dt);
+        const standoffByMode = { defense: 0.64, assault: 0.44, orbit: 0.5, wedge: 0.4, swarm: 0.52 };
+        const standoff = standoffByMode[enemy.squadMode] || 0.44;
+        if (threat) enemy.z = Math.min(0.92, enemy.z + 0.3 * dt);
+        else if (enemy.z > standoff) enemy.z -= speedBase * 0.55 * dt;
+        if (enemy.fireTimer <= 0) {
+          const modeFactorByMode = { defense: 1.25, assault: 0.9, orbit: 1.0, wedge: 0.8, swarm: 1.1 };
+          const modeFactor = modeFactorByMode[enemy.squadMode] || 0.9;
+          enemy.fireTimer = Math.max(1.2, (3.1 - this.wave * 0.1) / diff) * modeFactor + Math.random() * 0.4;
+          enemy.burstLeft = 3;
+          enemy.burstTimer = 0;
+          for (const wing of this.enemies) {
+            if (wing.escort && wing.type === 'enemy' && !wing.dead) {
+              this.spawnEnemyBullet(wing.angle, wing.z, ENEMY_TYPES.enemy.damage - 10);
+            }
+          }
+        }
+        if (enemy.burstLeft > 0) {
+          enemy.burstTimer -= dt;
+          if (enemy.burstTimer <= 0) {
+            this.spawnEnemyBullet(enemy.angle, enemy.z, ENEMY_TYPES.elite.damage - 10);
+            enemy.burstLeft -= 1;
+            enemy.burstTimer = 0.12;
+          }
+        }
+        if (enemy.missileTimer <= 0) {
+          enemy.missileTimer = Math.max(2.0, (5.5 - this.wave * 0.12) / diff);
+          this.spawnEnemyMissile(enemy, ENEMY_TYPES.elite.damage - 10);
         }
       }
     }
@@ -506,8 +677,8 @@ export class Shooter {
     }
     if (this.boss) {
       for (const bullet of this.bullets) {
-        if (Math.abs(angleDelta(this.boss.angle, bullet.angle)) < 0.18 &&
-            Math.abs(this.boss.z - bullet.z) < 0.10) {
+        if (Math.abs(angleDelta(this.boss.angle, bullet.angle)) < 0.30 &&
+            Math.abs(this.boss.z - bullet.z) < 0.16) {
           if (bullet.hitIds && bullet.hitIds.has('boss')) continue;
           this.boss.hp -= bullet.damage || BULLET_DAMAGE;
           this.boss.flashUntil = performance.now() + 90;
@@ -555,36 +726,86 @@ export class Shooter {
     this.updatePlayer(dt);
   }
 
-  spawnEnemy(type) {
+  spawnEnemy(type, angleOverride, escort = false) {
     const meta = ENEMY_TYPES[type];
-    this.enemies.push({
+    const spawnAngle = Number.isFinite(angleOverride)
+      ? clamp(angleOverride, -Math.PI / 2, Math.PI / 2)
+      : (Math.random() * 2 - 1) * (Math.PI / 2 - 0.06);
+    const enemy = {
       id: ++this.enemySeq,
       type,
-      angle: (Math.random() * 2 - 1) * (Math.PI / 2 - 0.12),
+      angle: spawnAngle,
+      laneOffset: escort ? (Math.random() * 2 - 1) * 0.16 : (Math.random() * 2 - 1) * 0.5,
+      escort,
+      modeTimer: 1.5 + Math.random() * 2.5,
+      diveTimer: 0,
+      spawnAge: 0,
       z: 0.96,
       hp: meta.maxHp,
       maxHp: meta.maxHp,
-      speedFactor: type === 'elite' ? 0.7 : 1 + Math.random() * 0.25,
+      speedFactor: type === 'elite' ? 0.85 : 1 + Math.random() * 0.25,
       wobble: Math.random() * Math.PI * 2,
       dodgeCooldown: 0,
-      fireTimer: 2.2 + Math.random() * 1.6,
-    });
+      fireTimer: 0.35 + Math.random() * 0.55,
+      burstLeft: 0,
+      burstTimer: 0,
+      missileTimer: type === 'elite' ? 3.2 + Math.random() * 1.8 : 0,
+      captainId: null,
+      squadMode: null,
+      squadTimer: 2.5,
+    };
+    this.enemies.push(enemy);
+    return enemy;
+  }
+
+  spawnEliteSquad() {
+    const base = (Math.random() * 2 - 1) * (Math.PI / 2 - 0.35);
+    const captain = this.spawnEnemy('elite', base);
+    captain.squadMode = SQUAD_MODES[Math.floor(Math.random() * SQUAD_MODES.length)];
+    captain.squadTimer = 6 + Math.random() * 2;
+    const escorts = Math.min(10, 3 + Math.floor(this.wave * 0.55) + Math.floor(Math.random() * 2));
+    for (let i = 0; i < escorts; i += 1) {
+      const offset = (i - (escorts - 1) / 2) * 0.2 + (Math.random() * 2 - 1) * 0.04;
+      const wing = this.spawnEnemy('enemy', base + offset, true);
+      wing.captainId = captain.id;
+      wing.laneOffset = (i - (escorts - 1) / 2) * 0.22;
+    }
+  }
+
+  beginBossWarning() {
+    this.bossPendingUntil = performance.now() + 2000;
+    this.showAlert('⚠ 首领出没', 'BOSS INCOMING');
+  }
+
+  showAlert(title, sub, duration = 2000) {
+    if (!this.alert) return;
+    this.alert.querySelector('.sr-fighter-alert-title').textContent = title;
+    this.alert.querySelector('.sr-fighter-alert-sub').textContent = sub;
+    this.alert.classList.add('is-visible');
+    this.alertUntil = performance.now() + duration;
   }
 
   spawnBoss() {
+    const now = performance.now();
+    const hp = 1500 + this.wave * 160;
     this.boss = {
-      hp: ENEMY_TYPES.boss.maxHp + this.wave * 10,
-      maxHp: ENEMY_TYPES.boss.maxHp + this.wave * 10,
-      z: 0.58,
+      hp,
+      maxHp: hp,
+      z: 0.92,
       targetZ: 0.55,
       angle: 0,
-      attackTimer: 1.6,
+      attackTimer: 999,
       dodgeCooldown: 0,
       phase: 1,
+      missileTimer: 999,
+      dashTimer: 999,
+      spawnAge: 0,
+      entryOffsetY: -this.h * 0.9,
+      introUntil: now + 1300,
     };
     this.bossBullets = [];
     this.bossChargeUntil = 0;
-    this.bossHeavyTimer = 6;
+    this.bossHeavyTimer = 7;
     this.bossTimer = 0;
     this.laserUntil = 0;
     this.laserAngle = 0;
@@ -619,6 +840,7 @@ export class Shooter {
     this.spawnBurst(point.x, point.y, 14, 170);
     this.spawnFloater(point.x, point.y - 10, `+${ENEMY_TYPES[enemy.type].points}`);
     this.maybeDrop(enemy.type, point);
+    this.addUltCharge(enemy.type === 'elite' ? 2 : 1);
     this.updateHud();
   }
 
@@ -628,6 +850,7 @@ export class Shooter {
     this.score += ENEMY_TYPES.boss.points;
     this.spawnFloater(point.x, point.y - 20, `+${ENEMY_TYPES.boss.points}`);
     this.maybeDrop('boss', point);
+    this.addUltCharge(4);
     this.boss = null;
     this.wave += 1;
     this.waveTimer = 14;
@@ -656,6 +879,7 @@ export class Shooter {
     if (this.buffHudTimer <= 0) {
       this.buffHudTimer = 0.25;
       this.updateBuffHud();
+      this.updateAbilityHud();
     }
   }
 
@@ -664,7 +888,8 @@ export class Shooter {
     const chance = DROP_CHANCE[kind] || 0;
     for (let i = 0; i < drops; i += 1) {
       if (kind !== 'boss' && Math.random() > chance) continue;
-      const ids = Object.keys(REWARD_META);
+      const ids = Object.keys(REWARD_META).filter((id) =>
+        (id !== 'missile' || this.wave >= 3) && (id !== 'cooldown' || this.wave >= 2));
       const type = ids[Math.floor(Math.random() * ids.length)];
       const spread = 18;
       this.pickups.push({
@@ -702,6 +927,10 @@ export class Shooter {
       this.buffs.fireRate = Math.min(3, (this.buffs.fireRate || 0) + 1);
     } else if (type === 'piercing-laser') {
       this.buffs.piercing = 1;
+    } else if (type === 'missile') {
+      this.buffs.missile = Math.min(3, (this.buffs.missile || 0) + 1);
+    } else if (type === 'cooldown') {
+      this.buffs.counterCd = Math.min(3, (this.buffs.counterCd || 0) + 1);
     }
     this.spawnBurst(point.x, point.y, 18, 150);
     this.spawnFloater(point.x, point.y - 34, meta.name);
@@ -718,6 +947,8 @@ export class Shooter {
     if (this.buffs.damageUp) chips.push({ id: 'damage-up', label: '伤害 Lv' + this.buffs.damageUp });
     if (this.buffs.fireRate) chips.push({ id: 'fire-rate', label: '射速 Lv' + this.buffs.fireRate });
     if (this.buffs.piercing) chips.push({ id: 'piercing-laser', label: '穿透' });
+    if (this.buffs.missile) chips.push({ id: 'missile', label: '导弹 Lv' + this.buffs.missile });
+    if (this.buffs.counterCd) chips.push({ id: 'cooldown', label: '反制冷却 Lv' + this.buffs.counterCd });
     const signature = chips.map((chip) => chip.id + ':' + chip.label).join('|');
     if (signature === this.buffSignature) return;
     this.buffSignature = signature;
@@ -727,6 +958,167 @@ export class Shooter {
         (art ? '<img src="' + art + '" alt="">' : '') +
         chip.label + '</span>';
     }).join('');
+  }
+
+  difficulty() {
+    return 1 + Math.min(1.5, (this.wave - 1) * 0.1 + this.runTime / 120 * 0.12);
+  }
+
+  addUltCharge(value) {
+    if (!this.ultUnlocked) return;
+    this.ultCharge = Math.min(ULT_MAX, this.ultCharge + value);
+    this.updateAbilityHud();
+  }
+
+  spawnEnemyBullet(angle, z, damage) {
+    this.bossBullets.push({ angle, z: z - 0.02, speed: BULLET_SPEED, damage });
+  }
+
+  spawnEnemyMissile(source, damage) {
+    if (!source) return;
+    this.enemyMissiles.push({
+      angle: source.angle,
+      z: Math.min(0.95, source.z - 0.02),
+      speed: ENEMY_MISSILE_SPEED * this.difficulty(),
+      turn: 1.25,
+      damage,
+      life: 6,
+    });
+    const point = this.project(source.angle, source.z);
+    this.spawnBurst(point.x, point.y, 7, 85);
+  }
+
+  updateEnemyMissiles(dt) {
+    for (const missile of this.enemyMissiles) {
+      missile.life -= dt;
+      missile.angle = moveAngle(missile.angle, this.playerAngle, missile.turn * dt);
+      missile.z -= missile.speed * dt;
+      if (missile.z <= 0.04) {
+        missile.dead = true;
+        const safe = performance.now() < this.invulnUntil;
+        if (!safe && Math.abs(angleDelta(missile.angle, this.playerAngle)) < 0.2) {
+          this.hitPlayer(missile.damage);
+        }
+      }
+      if (missile.life <= 0 || missile.z < -0.1) missile.dead = true;
+    }
+    this.enemyMissiles = this.enemyMissiles.filter((missile) => !missile.dead);
+  }
+
+  counterCooldownMs() {
+    const level = this.buffs.counterCd || 0;
+    return COUNTER_COOLDOWN * Math.pow(0.8, level) * 1000;
+  }
+
+  fireCounterMissile() {
+    if (this.phase !== 'running') return;
+    const now = performance.now();
+    if (now < (this.counterUntil || 0)) return;
+    this.counterUntil = now + this.counterCooldownMs();
+    this.spawnPlayerMissile('counter');
+    this.updateAbilityHud();
+  }
+
+  fireUltimate() {
+    if (this.phase !== 'running' || !this.ultUnlocked || this.ultCharge < ULT_MAX) return;
+    this.ultCharge = 0;
+    this.emUntil = performance.now() + 420;
+    this.emAngle = this.playerAngle;
+    const beamAngle = this.emAngle;
+    for (const enemy of [...this.enemies]) {
+      if (Math.abs(angleDelta(enemy.angle, beamAngle)) < 0.13) {
+        enemy.hp -= 120;
+        enemy.flashUntil = performance.now() + 90;
+        const p = this.project(enemy.angle, enemy.z);
+        this.spawnBurst(p.x, p.y, 8, 130);
+        if (enemy.hp <= 0) this.killEnemy(enemy);
+      }
+    }
+    if (this.boss && Math.abs(angleDelta(this.boss.angle, beamAngle)) < 0.18) {
+      this.boss.hp -= 180;
+      this.boss.flashUntil = performance.now() + 120;
+      const p = this.project(this.boss.angle, this.boss.z);
+      this.spawnBurst(p.x, p.y, 20, 180);
+      if (this.boss.hp <= 0) this.killBoss();
+    }
+    this.bossBullets = this.bossBullets.filter((b) => Math.abs(angleDelta(b.angle, beamAngle)) > 0.12);
+    this.enemyMissiles = this.enemyMissiles.filter((m) => Math.abs(angleDelta(m.angle, beamAngle)) > 0.12);
+    const vp = this.project(beamAngle, 1);
+    this.spawnBurst(vp.x, vp.y, 20, 120);
+    this.spawnFloater(this.w / 2, this.h * 0.35, '电磁炮');
+    this.updateHud();
+  }
+
+  spawnPlayerMissile(kind) {
+    const from = this.project(this.playerAngle, 0);
+    const dirX = Math.sin(this.playerRot || 0);
+    const dirY = -Math.cos(this.playerRot || 0);
+    const noseDist = Math.max(14, this.playerW * 0.18);
+    this.playerMissiles.push({
+      kind,
+      angle: this.playerAngle,
+      z: 0.03,
+      speed: kind === 'counter' ? 1.5 : 1.8,
+      turn: 2.4,
+      ttl: 4.5,
+      damage: kind === 'counter' ? 30 : 25,
+      target: null,
+      sx: from.x + dirX * noseDist,
+      sy: from.y + dirY * noseDist,
+    });
+  }
+
+  findPlayerMissileTarget(kind) {
+    let best = null;
+    const consider = (entry) => {
+      if (!entry) return;
+      const value = Math.abs(angleDelta(entry.angle, this.playerAngle)) + entry.z * 0.4;
+      if (!best || value < best.value) best = { ...entry, value };
+    };
+    for (const missile of this.enemyMissiles) {
+      if (!missile.dead) consider({ type: 'missile', ref: missile, angle: missile.angle, z: missile.z });
+    }
+    if (kind === 'counter' && best) return best;
+    for (const enemy of this.enemies) {
+      if (!enemy.dead) consider({ type: 'enemy', ref: enemy, angle: enemy.angle, z: enemy.z });
+    }
+    if (this.boss) consider({ type: 'boss', ref: this.boss, angle: this.boss.angle, z: this.boss.z });
+    return best;
+  }
+
+  updatePlayerMissiles(dt) {
+    for (const missile of this.playerMissiles) {
+      missile.ttl -= dt;
+      const target = this.findPlayerMissileTarget(missile.kind);
+      missile.target = target;
+      if (target) {
+        missile.angle = moveAngle(missile.angle, target.angle, missile.turn * dt);
+        const dz = target.z - missile.z;
+        missile.z += Math.sign(dz) * Math.min(Math.abs(dz), missile.speed * dt);
+        if (Math.abs(dz) < 0.06 && Math.abs(angleDelta(missile.angle, target.angle)) < 0.12) {
+          missile.dead = true;
+          const point = this.project(target.angle, target.z);
+          this.spawnBurst(point.x, point.y, 10, 140);
+          if (target.type === 'missile') {
+            target.ref.dead = true;
+            this.score += 5;
+          } else if (target.type === 'enemy') {
+            target.ref.hp -= missile.damage;
+            target.ref.flashUntil = performance.now() + 90;
+            if (target.ref.hp <= 0) this.killEnemy(target.ref);
+          } else if (target.type === 'boss') {
+            this.boss.hp -= missile.damage;
+            this.boss.flashUntil = performance.now() + 90;
+            if (this.boss.hp <= 0) this.killBoss();
+          }
+          this.updateHud();
+        }
+      } else {
+        missile.z += missile.speed * dt;
+      }
+      if (missile.ttl <= 0 || missile.z > 1.05) missile.dead = true;
+    }
+    this.playerMissiles = this.playerMissiles.filter((missile) => !missile.dead);
   }
 
   spawnBurst(x, y, count, force) {
@@ -837,6 +1229,174 @@ export class Shooter {
     }
     ctx.globalAlpha = 1;
 
+    // hostile tracking missiles — thick trail, warhead ring and lock-on ring
+    for (const missile of this.enemyMissiles) {
+      const from = this.project(missile.angle, missile.z);
+      const to = this.project(missile.angle, missile.z - 0.2);
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 90);
+      ctx.strokeStyle = colors.fg;
+      ctx.globalAlpha = 0.5;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 4]);
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 0.95;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+      ctx.globalAlpha = 0.95;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      ctx.moveTo(from.x - 6, from.y + 6);
+      ctx.lineTo(from.x, from.y);
+      ctx.lineTo(from.x + 6, from.y + 6);
+      ctx.stroke();
+      ctx.globalAlpha = 0.35 + pulse * 0.5;
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.arc(from.x, from.y, 5 + pulse * 4, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // incoming-missile warning around the player
+    if (this.enemyMissiles.some((missile) =>
+      missile.z < 0.4 && Math.abs(angleDelta(missile.angle, this.playerAngle)) < 0.35)) {
+      const point = this.project(this.playerAngle, 0);
+      const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 110);
+      ctx.globalAlpha = 0.35 + pulse * 0.45;
+      ctx.strokeStyle = colors.fg;
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.arc(point.x, point.y, 20 + pulse * 6, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.globalAlpha = 1;
+    }
+
+    // player counter / buff missiles
+    for (const missile of this.playerMissiles) {
+      const from = this.project(missile.angle, missile.z);
+      const to = this.project(missile.angle, Math.min(1, missile.z + 0.06));
+      ctx.globalAlpha = 0.95;
+      ctx.strokeStyle = colors.fg;
+      ctx.lineWidth = missile.kind === 'counter' ? 2.2 : 1.8;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+
+    // X: electromagnetic cannon
+    if (performance.now() < (this.emUntil || 0)) {
+      const from = this.project(this.emAngle, 0);
+      const to = this.project(this.emAngle, 1);
+      ctx.strokeStyle = colors.fg;
+      ctx.globalAlpha = 0.22;
+      ctx.lineWidth = 12;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+      ctx.globalAlpha = 0.95;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+      ctx.globalAlpha = 0.45;
+      ctx.lineWidth = 1;
+      for (const offset of [-0.018, 0.018]) {
+        const a = this.project(this.emAngle + offset, 0);
+        const b = this.project(this.emAngle + offset, 1);
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    // boss burst laser — thick core, moving pulses, shockwave and screen flash
+    if (this.boss && performance.now() < (this.laserUntil || 0)) {
+      const now = performance.now();
+      const origin = this.project(this.laserAngle, this.boss.z);
+      const left = this.project(this.laserAngle - this.laserWidth, 0);
+      const right = this.project(this.laserAngle + this.laserWidth, 0);
+      const center = this.project(this.laserAngle, 1);
+      const elapsed = now - (this.laserStartedAt || now);
+      const appear = clamp(elapsed / 220, 0, 1);
+      ctx.fillStyle = colors.fg;
+      ctx.globalAlpha = 0.18 * appear;
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(left.x, left.y);
+      ctx.lineTo(right.x, right.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = colors.fg;
+      ctx.lineWidth = 24;
+      ctx.globalAlpha = 0.16;
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(center.x, center.y);
+      ctx.stroke();
+      ctx.lineWidth = 10;
+      ctx.globalAlpha = 0.42;
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(center.x, center.y);
+      ctx.stroke();
+      ctx.lineWidth = 4;
+      ctx.globalAlpha = 0.95;
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(center.x, center.y);
+      ctx.stroke();
+      ctx.lineWidth = 1.5;
+      ctx.globalAlpha = 1;
+      ctx.beginPath();
+      ctx.moveTo(origin.x, origin.y);
+      ctx.lineTo(center.x, center.y);
+      ctx.stroke();
+      // moving energy pulses along the beam
+      for (let i = 0; i < 4; i += 1) {
+        const t = ((now - (this.laserStartedAt || now)) / 260 + i / 4) % 1;
+        const x = origin.x + (center.x - origin.x) * t;
+        const y = origin.y + (center.y - origin.y) * t;
+        ctx.globalAlpha = 0.9 * (1 - Math.abs(t - 0.5) * 0.8);
+        ctx.lineWidth = 9;
+        ctx.beginPath();
+        ctx.moveTo(x - 5, y);
+        ctx.lineTo(x + 5, y);
+        ctx.stroke();
+      }
+      // shockwave at the muzzle and near the target
+      const wave = clamp(elapsed / 520, 0, 1);
+      ctx.globalAlpha = (1 - wave) * 0.7;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(origin.x, origin.y, 18 + wave * 90, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(left.x, left.y, 12 + wave * 48, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    if (performance.now() < (this.laserFlashUntil || 0)) {
+      ctx.globalAlpha = 0.16;
+      ctx.fillStyle = colors.fg;
+      ctx.fillRect(0, 0, w, h);
+      ctx.globalAlpha = 1;
+    }
+
     // boss projectiles (aimed shots + charged spread)
     for (const bullet of this.bossBullets) {
       const from = this.project(bullet.angle, bullet.z);
@@ -851,13 +1411,33 @@ export class Shooter {
     }
     ctx.globalAlpha = 1;
 
-    // boss charging telegraph
+    // boss charging telegraph: show the exact danger lane before it fires
     if (this.boss && performance.now() < (this.bossChargeUntil || 0)) {
       const point = this.project(this.boss.angle, this.boss.z);
+      const phase = this.boss.hp <= this.boss.maxHp * 0.5 ? 2 : 1;
+      const width = phase === 2 ? 0.42 : 0.30;
+      const left = this.project(this.boss.angle - width, 0);
+      const right = this.project(this.boss.angle + width, 0);
       const pulse = 0.5 + 0.5 * Math.sin(performance.now() / 70);
-      ctx.globalAlpha = 0.45 + pulse * 0.4;
+      ctx.globalAlpha = 0.06 + pulse * 0.06;
+      ctx.fillStyle = colors.fg;
+      ctx.beginPath();
+      ctx.moveTo(point.x, point.y);
+      ctx.lineTo(left.x, left.y);
+      ctx.lineTo(right.x, right.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.globalAlpha = 0.45 + pulse * 0.35;
       ctx.strokeStyle = colors.fg;
-      ctx.lineWidth = 1.2;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([6, 5]);
+      ctx.beginPath();
+      ctx.moveTo(point.x, point.y);
+      ctx.lineTo(left.x, left.y);
+      ctx.moveTo(point.x, point.y);
+      ctx.lineTo(right.x, right.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
       ctx.beginPath();
       ctx.arc(point.x, point.y, 24 + pulse * 14, 0, Math.PI * 2);
       ctx.stroke();
@@ -890,7 +1470,7 @@ export class Shooter {
       const ratio = clamp(this.boss.hp / this.boss.maxHp, 0, 1);
       const barW = Math.min(260, this.w * 0.42);
       const x = (this.w - barW) / 2;
-      const y = 34;
+      const y = this.h - 34;
       ctx.globalAlpha = 0.9;
       ctx.strokeStyle = colors.fg;
       ctx.lineWidth = 1;
@@ -917,6 +1497,7 @@ export class Shooter {
   drawEnemy(enemy) {
     const meta = ENEMY_TYPES[enemy.type] || ENEMY_TYPES.enemy;
     const point = this.project(enemy.angle, enemy.z);
+    if (enemy.type === 'boss') point.y += enemy.entryOffsetY || 0;
     if (point.y < -80 || point.x < -80 || point.x > this.w + 80) return;
     const img = this.images[enemy.type] || this.images.enemy;
     const depthScale = 1 / (1 + enemy.z * 2.2);
@@ -930,11 +1511,13 @@ export class Shooter {
       this.ctx.arc(point.x, point.y, Math.max(3, desired / 2), 0, Math.PI * 2);
       this.ctx.stroke();
     }
-    this.ctx.globalAlpha = 0.92;
+    const spawnT = clamp(1 - (enemy.spawnAge || 0) / 0.55, 0, 1);
+    this.ctx.globalAlpha = 0.92 * (1 - spawnT * 0.75);
     if (img.complete && img.naturalWidth) {
       this.ctx.shadowColor = this.scheme === 'dark' ? 'rgba(255,255,255,.35)' : 'rgba(0,0,0,.28)';
       this.ctx.shadowBlur = 4;
-      this.ctx.drawImage(img, point.x - width / 2, point.y - height / 2, width, height);
+      const scale = 0.82 + (1 - spawnT) * 0.18;
+      this.ctx.drawImage(img, point.x - (width * scale) / 2, point.y - (height * scale) / 2, width * scale, height * scale);
       this.ctx.shadowBlur = 0;
       this.ctx.shadowColor = 'transparent';
     } else {

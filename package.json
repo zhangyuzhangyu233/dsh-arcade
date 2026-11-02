@@ -1,7 +1,7 @@
 {
   "name": "@kennielearngames/dsh-arcade",
-  "version": "0.3.0",
-  "description": "🕹️ dsh-arcade — a two-game arcade that lives around your DeepSeek Harness composer: a pixel sushi runner and a wireframe deep-space fighter, with rewards, bosses and settings-based game switching.",
+  "version": "0.4.0",
+  "description": "🕹️ dsh-arcade — a two-game arcade for DeepSeek Harness: a pixel sushi runner and a wireframe deep-space fighter with squads, counter-missiles, an EM main cannon and boss warning banners.",
   "type": "module",
   "main": "index.js",
   "author": "zhangyuzhangyu233",

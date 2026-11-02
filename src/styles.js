@@ -60,8 +60,10 @@ export const CSS = `
 .sr-fighter-player svg{display:block;width:100%;height:auto}
 .sr-fighter-player--invert{filter:invert(1) drop-shadow(0 2px 3px rgba(0,0,0,.25))}
 .sr-fighter-player.is-invulnerable{opacity:.45}
-.sr-fighter-hud{position:absolute;left:12px;top:8px;display:flex;gap:10px;align-items:center;
-  font-size:11.5px;color:var(--sr-muted);pointer-events:none;z-index:3;font-variant-numeric:tabular-nums}
+.sr-fighter-hud{position:absolute;left:12px;top:8px;display:flex;flex-direction:column;gap:3px;
+  font-size:11px;color:var(--sr-muted);pointer-events:none;z-index:3;font-variant-numeric:tabular-nums}
+.sr-fighter-hud-main{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.sr-fighter-hud-hp{display:flex;align-items:center}
 .sr-fighter-hud b{color:var(--sr-fg);font-weight:600}
 .sr-fighter-title{font-weight:600;color:var(--sr-fg);font-size:12.5px;letter-spacing:.02em}
 .sr-fighter-hp{display:inline-flex;align-items:center;gap:4px;color:var(--sr-muted)}
@@ -69,13 +71,30 @@ export const CSS = `
   background:var(--sr-line);position:relative;overflow:hidden}
 .sr-fighter-hp i::after{content:'';position:absolute;inset:0;width:calc(var(--hp,1) * 100%);
   background:var(--sr-fg);border-radius:2px;transition:width .12s ease-out}
-.sr-fighter-buffs{position:absolute;right:44px;top:8px;display:flex;gap:6px;align-items:center;
-  pointer-events:none;z-index:3;flex-wrap:wrap;justify-content:flex-end;max-width:60%}
-.sr-fighter-buff{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:99px;
-  border:1px solid var(--sr-line);background:var(--sr-soft);color:var(--sr-fg);font-size:10.5px;line-height:1.4}
+.sr-fighter-buffs{position:absolute;right:42px;top:8px;display:flex;gap:4px;align-items:center;
+  pointer-events:none;z-index:3;flex-wrap:wrap;justify-content:flex-end;max-width:46%}
+.sr-fighter-buff{display:inline-flex;align-items:center;gap:3px;padding:1px 6px;border-radius:99px;
+  border:1px solid var(--sr-line);background:var(--sr-soft);color:var(--sr-fg);font-size:10px;line-height:1.5}
 .sr-fighter-buff img{width:13px;height:13px;display:block}
-.sr-fighter-help{position:absolute;left:12px;bottom:8px;font-size:10.5px;color:var(--sr-muted);
-  opacity:.8;pointer-events:none;z-index:3}
+.sr-fighter-abilities{position:absolute;left:12px;bottom:8px;display:flex;gap:8px;align-items:center;
+  pointer-events:none;z-index:3;font-size:10.5px;color:var(--sr-muted);font-variant-numeric:tabular-nums}
+.sr-fighter-ability{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:99px;
+  border:1px solid var(--sr-line);background:var(--sr-soft)}
+.sr-fighter-ability b{color:var(--sr-fg);font-weight:600}
+.sr-fighter-abilities.is-ult-ready .sr-fighter-ult{border-color:var(--sr-fg);background:var(--sr-soft);color:var(--sr-fg)}
+.sr-fighter-alert{position:absolute;left:0;right:0;top:50%;height:72px;transform:translateY(-50%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;overflow:hidden;
+  pointer-events:none;z-index:5;opacity:0;transition:opacity .18s ease-out;color:var(--sr-fg);
+  border-top:2px solid var(--sr-fg);border-bottom:2px solid var(--sr-fg);
+  background:color-mix(in srgb, var(--sr-bg) 72%, transparent);text-align:center}
+.sr-fighter-alert::before{content:'';position:absolute;inset:0;
+  background:repeating-linear-gradient(135deg, var(--sr-fg) 0 2px, transparent 2px 14px);
+  opacity:.16;animation:sr-alert-stripes .9s linear infinite;pointer-events:none}
+.sr-fighter-alert.is-visible{opacity:1;animation:sr-alert-blink .72s ease-in-out infinite alternate}
+.sr-fighter-alert-title{position:relative;z-index:1;font-size:19px;font-weight:700;letter-spacing:.1em}
+.sr-fighter-alert-sub{position:relative;z-index:1;font-size:10px;letter-spacing:.34em;opacity:.65}
+@keyframes sr-alert-stripes{from{background-position:0 0}to{background-position:28px 0}}
+@keyframes sr-alert-blink{from{opacity:.58;filter:brightness(.82)}to{opacity:1;filter:brightness(1.25)}}
 .sr-fighter-shade{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
   justify-content:center;gap:6px;background:rgba(8,10,18,.45);z-index:4;cursor:pointer}
 .sr-fighter-shade.is-visible{display:flex}
